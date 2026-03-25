@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 import { connectDB, sequelize } from "./config/db.js";
 import couponRoutes from "./routes/coupon.routes.js";
 import errorHandler from "./middleware/errorHandler.js";
@@ -12,6 +13,29 @@ import { logger } from "./utils/logger.js";
 dotenv.config();
 
 const app = express();
+
+const getAllowedOrigins = () => {
+  const raw = process.env.CORS_ORIGINS || process.env.APP_URL || "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+const allowedOrigins = getAllowedOrigins();
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow non-browser requests (curl, server-to-server) with no Origin header
+      if (!origin) return cb(null, true);
+      // If not configured, allow all origins (useful for local dev)
+      if (allowedOrigins.length === 0) return cb(null, true);
+      // Otherwise allow only configured origins
+      return cb(null, allowedOrigins.includes(origin));
+    },
+  })
+);
 
 // JSON middleware
 app.use(express.json());
@@ -49,7 +73,11 @@ const startServer = async () => {
     logger.info("Tables created successfully");
 
     app.listen(PORT, () => {
-      logger.info(`Server running on http://localhost:${PORT}`);
+      logger.info("Server running", {
+        port: PORT,
+        corsAllowedOrigins: allowedOrigins.length ? allowedOrigins : ["*"],
+        appUrl: process.env.APP_URL || null,
+      });
     });
 
   } catch (error) {

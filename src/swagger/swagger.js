@@ -1,6 +1,12 @@
 import swaggerJSDoc from "swagger-jsdoc";
 import "./coupons.swagger.js"; // Import the file containing Swagger annotations
 
+const baseUrl =
+  process.env.APP_URL ||
+  process.env.BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  "http://localhost:3000";
+
 const options = {
   definition: {
     openapi: "3.0.0",
@@ -11,7 +17,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000"
+        url: baseUrl
       }
     ]
   },
