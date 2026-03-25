@@ -1,6 +1,8 @@
 import { prisma } from "../config/prisma.js";
-import { Prisma } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import { logger } from "../utils/logger.js";
+
+const { Prisma } = prismaPkg;
 
 const toPrismaDateTime = (value) => {
   if (!value) return value;
