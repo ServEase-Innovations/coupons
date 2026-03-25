@@ -1,0 +1,782 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Coupon {
+  coupon_id           String                     @id @default(uuid()) @db.Uuid
+  coupon_code         String                     @unique @db.VarChar(255)
+  description         String?                    @db.VarChar(255)
+  service_type        enum_coupons_service_type
+  discount_type       enum_coupons_discount_type
+  discount_value      Float
+  minimum_order_value Float?
+  usage_limit         Int?
+  usage_per_user      Int?
+  start_date          DateTime                   @db.Timestamptz(6)
+  end_date            DateTime                   @db.Timestamptz(6)
+  city                String?                    @db.VarChar(255)
+  isActive            Boolean?                   @default(true)
+  created_at          DateTime?                  @db.Timestamptz(6)
+  coupon_redemptions  coupon_redemptions[]
+
+  @@map("coupons")
+}
+
+model coupon_redemptions {
+  redemption_id    String    @id @default(uuid()) @db.Uuid
+  coupon_id        String    @db.Uuid
+  customer_id      BigInt    @map("user_id")
+  engagement_id    BigInt?
+  status           String    @default("RESERVED") @db.VarChar(20)
+  discount_amount  Float
+  reserved_at      DateTime  @default(now()) @db.Timestamptz(6)
+  applied_at       DateTime? @db.Timestamptz(6)
+  released_at      DateTime? @db.Timestamptz(6)
+  expires_at       DateTime  @db.Timestamptz(6)
+  metadata         Json?
+  coupons          Coupon    @relation(fields: [coupon_id], references: [coupon_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([coupon_id, status])
+  @@index([customer_id, coupon_id, status])
+  @@index([engagement_id])
+  @@map("coupon_redemptions")
+}
+
+model address {
+  id                                                                 BigInt           @id @default(autoincrement())
+  country                                                            String?          @db.VarChar(255)
+  ctarea                                                             String?          @db.VarChar(255)
+  field1                                                             String?          @db.VarChar(255)
+  field2                                                             String?          @db.VarChar(255)
+  pinno                                                              String?          @db.VarChar(255)
+  state                                                              String?          @db.VarChar(255)
+  serviceprovider_serviceprovider_correspondence_address_idToaddress serviceprovider? @relation("serviceprovider_correspondence_address_idToaddress")
+  serviceprovider_serviceprovider_permanent_address_idToaddress      serviceprovider? @relation("serviceprovider_permanent_address_idToaddress")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model attendance {
+  id                 BigInt          @id
+  attendance_status  DateTime        @db.Timestamp(6)
+  description        String?         @db.VarChar(500)
+  is_attended        Boolean
+  is_customer_agreed Boolean
+  is_resolved        Boolean
+  taskstatus         String?         @db.VarChar(255)
+  customerid         BigInt
+  serviceproviderid  BigInt
+  customer           customer        @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fke150vehlbirwe0cdw2icb8np4")
+  serviceprovider    serviceprovider @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fklitkdnhf0h29tny0q5usvpevv")
+}
+
+model booking_transaction {
+  id                         BigInt                     @id @default(autoincrement())
+  amount                     Float
+  createdon                  DateTime                   @db.Timestamp(6)
+  transactionid              String                     @unique(map: "ukiabppyhkomirmgi6r02epx8on") @db.VarChar(255)
+  engagement_id              BigInt                     @unique(map: "ukq90yixy5ourcq2ntcple59et")
+  serviceprovider_engagement serviceprovider_engagement @relation(fields: [engagement_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkkivwnnxvqx05mibfdqqlwjtxl")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customer {
+  customerid                   BigInt                         @id @default(autoincrement())
+  kyc                          String?                        @db.VarChar(255)
+  alternateno                  BigInt?
+  buildingname                 String?                        @db.VarChar(255)
+  currentlocation              String?                        @db.VarChar(255)
+  emailid                      String                         @unique @db.VarChar(255)
+  enrolleddate                 DateTime?                      @db.Timestamptz(6)
+  firstname                    String                         @db.VarChar(255)
+  idno                         String?                        @db.VarChar(255)
+  isactive                     Boolean                        @default(true)
+  languageknown                String?                        @db.VarChar(255)
+  lastname                     String                         @db.VarChar(255)
+  locality                     String?                        @db.VarChar(255)
+  middlename                   String?                        @db.VarChar(255)
+  mobileno                     BigInt?                        @unique(map: "uksyres1de33wdw2ax48fqv2t54")
+  pincode                      Int?
+  profilepic                   String?                        @db.VarChar(255)
+  rating                       Float                          @default(0)
+  speciality                   String?                        @db.VarChar(255)
+  street                       String?                        @db.VarChar(255)
+  gender                       String?                        @db.VarChar(255)
+  attendance                   attendance[]
+  customer_holidays            customer_holidays[]
+  customer_leaves              customer_leaves[]
+  customer_wallets             customer_wallets?
+  customerfeedback             customerfeedback[]
+  engagements                  engagements[]
+  provider_reviews             provider_reviews[]
+  service_provider_feedback    service_provider_feedback[]
+  service_provider_payment     service_provider_payment[]
+  serviceprovider_engagement   serviceprovider_engagement[]
+  shortlisted_service_provider shortlisted_service_provider[]
+  wallet_transaction           wallet_transaction[]
+  wallet_transactions          wallet_transactions[]
+  wallets                      wallets?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customer_holidays {
+  id                         BigInt                     @id @default(autoincrement())
+  applyholidaydate           DateTime                   @db.Timestamp(6)
+  enddate                    DateTime                   @db.Date
+  isactive                   Boolean
+  servicetype                String?                    @db.VarChar(100)
+  startdate                  DateTime                   @db.Date
+  customer_id                BigInt?
+  engagement_id              BigInt
+  serviceprovider_engagement serviceprovider_engagement @relation(fields: [engagement_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkbwd4f3r07gcppsbem0fjyotp5")
+  customer                   customer?                  @relation(fields: [customer_id], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fkofahpk67fvlvwrssm4t7evjt")
+}
+
+model customer_leaves {
+  leave_id         BigInt       @id @default(autoincrement())
+  customerid       BigInt?
+  engagement_id    BigInt?
+  leave_type       String?      @db.VarChar(50)
+  status           String?      @default("PENDING") @db.VarChar(50)
+  reason           String?
+  leave_start_date DateTime?    @db.Date
+  leave_end_date   DateTime?    @db.Date
+  start_date       DateTime?    @db.Date
+  end_date         DateTime?    @db.Date
+  total_days       Int?
+  refund_amount    Decimal?     @db.Decimal(12, 2)
+  created_at       DateTime?    @default(now()) @db.Timestamp(6)
+  customer         customer?    @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction)
+  engagements      engagements? @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model customer_wallets {
+  wallet_id          BigInt               @id(map: "wallets_pkey") @default(autoincrement())
+  customerid         BigInt?              @unique(map: "wallets_customerid_key")
+  balance            Decimal?             @default(0) @db.Decimal(10, 2)
+  updated_at         DateTime?            @default(now()) @db.Timestamp(6)
+  customer           customer?            @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "wallets_customerid_fkey")
+  wallet_transaction wallet_transaction[]
+}
+
+model customerconcern {
+  id                 BigInt    @id @default(autoincrement())
+  createdon          DateTime  @db.Timestamp(6)
+  customerid         BigInt?
+  feedback           String?   @db.VarChar(500)
+  isresolved         String    @db.VarChar(255)
+  modifiedon         DateTime? @db.Timestamp(6)
+  resolutionrequired String    @db.VarChar(255)
+  resolvedby         BigInt?
+  resolvedon         DateTime? @db.Timestamp(6)
+}
+
+model customerfeedback {
+  id                BigInt          @id @default(autoincrement())
+  comment           String?         @db.VarChar(500)
+  commentedon       DateTime        @db.Timestamp(6)
+  rating            Int
+  customerid        BigInt
+  serviceproviderid BigInt
+  customername      String?         @db.VarChar(500)
+  customer          customer        @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fkbyf1ltiptm0lhl4d1rglkxevv")
+  serviceprovider   serviceprovider @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkmefrx4uwct97k6irm4cks4sok")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customerrequest {
+  requestid              BigInt                   @id @default(autoincrement())
+  agerange               String?                  @db.VarChar(255)
+  amount                 Float?
+  apartment_name         String?                  @db.VarChar(255)
+  area                   String?                  @db.VarChar(255)
+  assigneddate           DateTime                 @db.Timestamp(6)
+  cookinghabit           String?                  @db.VarChar(255)
+  createddate            DateTime                 @db.Timestamp(6)
+  customerid             BigInt?
+  days                   String?                  @db.VarChar(255)
+  dietryhabit            String?                  @db.VarChar(255)
+  enddate                DateTime?                @db.Timestamp(6)
+  gender                 String?                  @db.VarChar(255)
+  housekeepingrole       String                   @db.VarChar(255)
+  ispotential            String                   @db.VarChar(255)
+  isresolved             String                   @db.VarChar(255)
+  languageknown          String?                  @db.VarChar(255)
+  locality               String?                  @db.VarChar(255)
+  modifiedby             BigInt?
+  modifieddate           DateTime?                @db.Timestamp(6)
+  noofresources          String?                  @db.VarChar(255)
+  pincode                Int
+  serviceproviderid      BigInt?
+  startdate              DateTime?                @db.Timestamp(6)
+  status                 String?                  @db.VarChar(255)
+  supervisorid           BigInt?
+  timeslotlist           String                   @db.VarChar(255)
+  customerrequestcomment customerrequestcomment[]
+}
+
+model customerrequestcomment {
+  id              BigInt          @id @default(autoincrement())
+  comment         String          @db.VarChar(255)
+  commentedby     String          @db.VarChar(255)
+  commentedon     DateTime        @db.Timestamp(6)
+  requestid       BigInt
+  customerrequest customerrequest @relation(fields: [requestid], references: [requestid], onDelete: NoAction, onUpdate: NoAction, map: "fksip64pjkqkkl03x9994uhhreu")
+}
+
+model engagement_events {
+  event_id      Int         @id @default(autoincrement())
+  engagement_id BigInt
+  from_status   String?     @db.VarChar(50)
+  to_status     String      @db.VarChar(50)
+  event_type    String      @db.VarChar(100)
+  actor_type    String      @db.VarChar(50)
+  actor_id      Int?
+  metadata      Json?
+  created_at    DateTime?   @default(now()) @db.Timestamp(6)
+  engagements   engagements @relation(fields: [engagement_id], references: [engagement_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_engagement_events_created_at")
+  @@index([engagement_id], map: "idx_engagement_events_engagement_id")
+}
+
+model engagement_modifications {
+  modification_id   BigInt       @id @default(autoincrement())
+  engagement_id     BigInt?
+  modification_type String?      @db.VarChar(50)
+  old_start_date    DateTime?    @db.Date
+  old_end_date      DateTime?    @db.Date
+  new_start_date    DateTime?    @db.Date
+  new_end_date      DateTime?    @db.Date
+  created_at        DateTime?    @default(now()) @db.Timestamp(6)
+  modified_fields   Json?
+  modified_by_id    BigInt?
+  modified_by_role  String?      @db.VarChar(50)
+  modified_at       DateTime?    @default(now()) @db.Timestamp(6)
+  modified_by       BigInt?
+  modified_type     String?      @db.VarChar(50)
+  modified_data     Json?
+  engagements       engagements? @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model engagements {
+  engagement_id            BigInt                     @id @default(autoincrement())
+  customerid               BigInt?
+  serviceproviderid        BigInt?
+  responsibilities         Json?                      @default("[]")
+  booking_type             String?                    @db.VarChar(50)
+  service_type             String?                    @db.VarChar(50)
+  base_amount              Decimal?                   @default(0) @db.Decimal(10, 2)
+  start_date               DateTime?                  @db.Date
+  end_date                 DateTime?                  @db.Date
+  task_status              String?                    @default("NOT_STARTED") @db.VarChar(50)
+  active                   Boolean?                   @default(true)
+  created_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  assignment_status        String?                    @default("UNASSIGNED") @db.VarChar(20)
+  vacation_start_date      DateTime?                  @db.Date
+  vacation_end_date        DateTime?                  @db.Date
+  leave_days               Int?                       @default(0)
+  start_epoch              BigInt
+  end_epoch                BigInt?
+  engagement_status        String?                    @default("CREATED") @db.VarChar(30)
+  updated_at               DateTime?                  @default(now()) @db.Timestamp(6)
+  duration_minutes         Int?                       @default(60)
+  latitude                 Decimal?                   @db.Decimal
+  longitude                Decimal?                   @db.Decimal
+  address                  String?                    @db.VarChar(500)
+  customer_leaves          customer_leaves[]
+  engagement_events        engagement_events[]
+  engagement_modifications engagement_modifications[]
+  customer                 customer?                  @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction)
+  serviceprovider          serviceprovider?           @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+  payments                 payments[]
+  payouts                  payouts[]
+  provider_availability    provider_availability[]
+  provider_leaves          provider_leaves[]
+  provider_reviews         provider_reviews?
+  wallet_transaction       wallet_transaction[]
+  wallet_transactions      wallet_transactions[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model kyc {
+  kyc_id              BigInt         @id @default(autoincrement())
+  is_kyc_validated    Boolean
+  is_kyc_validated_by BigInt?
+  is_kyc_validated_on DateTime?      @db.Timestamp(6)
+  kyc_doc             Int?           @db.Oid
+  kyc_type            String         @db.VarChar(255)
+  kyc_type_id         String         @unique(map: "uk1ubetgj4wxrmjyk27hlh4xxyl") @db.VarChar(255)
+  service_provider_id BigInt
+  stage               String?        @db.VarChar(255)
+  status              String?        @db.VarChar(255)
+  kyc_comments        kyc_comments[]
+}
+
+model kyc_comments {
+  id                BigInt   @id @default(autoincrement())
+  comment           String?  @db.VarChar(255)
+  commented_by      String?  @db.VarChar(100)
+  commented_on      DateTime @db.Timestamp(6)
+  serviceproviderid BigInt
+  kyc_id            BigInt
+  kyc               kyc      @relation(fields: [kyc_id], references: [kyc_id], onDelete: NoAction, onUpdate: NoAction, map: "fk74qx4i2e1x3vf4nv68y0djbqk")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model leave_balance {
+  balance_id        BigInt          @id @default(autoincrement())
+  leave_balance     Int?
+  leave_taken       Int
+  leavetype         String?         @db.VarChar(255)
+  total_leaves      Int
+  serviceproviderid BigInt
+  serviceprovider   serviceprovider @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkfa2ha5yjdwfr61y3w9dwbpugk")
+}
+
+model payments {
+  payment_id        BigInt       @id @default(autoincrement())
+  engagement_id     BigInt?
+  base_amount       Decimal      @db.Decimal(10, 2)
+  platform_fee      Decimal      @db.Decimal(10, 2)
+  gst               Decimal      @db.Decimal(10, 2)
+  total_amount      Decimal      @db.Decimal(10, 2)
+  payment_mode      String?      @db.VarChar(50)
+  transaction_id    String?      @db.VarChar(255)
+  status            String?      @default("PENDING") @db.VarChar(50)
+  created_at        DateTime?    @default(now()) @db.Timestamp(6)
+  razorpay_order_id String?      @db.VarChar(255)
+  updated_at        DateTime?    @default(now()) @db.Timestamp(6)
+  engagements       engagements? @relation(fields: [engagement_id], references: [engagement_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payouts {
+  payout_id         BigInt           @id @default(autoincrement())
+  serviceproviderid BigInt?
+  engagement_id     BigInt?
+  gross_amount      Decimal?         @db.Decimal(10, 2)
+  provider_fee      Decimal?         @db.Decimal(10, 2)
+  tds_amount        Decimal?         @db.Decimal(10, 2)
+  net_amount        Decimal?         @db.Decimal(10, 2)
+  payout_mode       String?          @db.VarChar(50)
+  transaction_id    String?          @db.VarChar(255)
+  status            String?          @default("INITIATED") @db.VarChar(50)
+  created_at        DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?        @default(now()) @db.Timestamp(6)
+  engagements       engagements?     @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction)
+  serviceprovider   serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model provider_availability {
+  id                BigInt           @id @default(autoincrement())
+  serviceproviderid BigInt?
+  engagement_id     BigInt?
+  date              DateTime         @db.Date
+  status            String?          @default("BOOKED") @db.VarChar(20)
+  created_at        DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?        @default(now()) @db.Timestamp(6)
+  slot_start_epoch  BigInt?
+  slot_end_epoch    BigInt?
+  engagements       engagements?     @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction)
+  serviceprovider   serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "provider_availability_provider_id_fkey")
+
+  @@index([serviceproviderid, date], map: "idx_provider_availability_available", where: raw("((status)::text = 'AVAILABLE'::text)"))
+  @@index([serviceproviderid, date], map: "idx_provider_availability_date")
+  @@index([engagement_id], map: "idx_provider_availability_engagement")
+  @@index([serviceproviderid, slot_start_epoch, slot_end_epoch], map: "idx_provider_availability_epoch")
+  @@index([serviceproviderid, date], map: "idx_provider_availability_provider_date")
+}
+
+model provider_daily_slots {
+  id                BigInt           @id @default(autoincrement())
+  serviceproviderid BigInt?
+  slot_date         DateTime         @db.Date
+  slot_start        DateTime         @db.Timestamp(6)
+  slot_end          DateTime         @db.Timestamp(6)
+  status            String?          @default("AVAILABLE") @db.VarChar(20)
+  serviceprovider   serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model provider_leaves {
+  leave_id          BigInt           @id @default(autoincrement())
+  serviceproviderid BigInt?
+  engagement_id     BigInt?
+  start_date        DateTime?        @db.Date
+  end_date          DateTime?        @db.Date
+  reason            String?
+  status            String?          @default("PENDING") @db.VarChar(50)
+  created_at        DateTime?        @default(now()) @db.Timestamp(6)
+  engagements       engagements?     @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction)
+  serviceprovider   serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model provider_ledger {
+  ledger_id         BigInt    @id @default(autoincrement())
+  serviceproviderid BigInt
+  engagement_id     BigInt?
+  amount            Decimal   @db.Decimal(12, 2)
+  direction         String?   @db.VarChar(10)
+  reason            String?   @db.VarChar(50)
+  reference_type    String?   @db.VarChar(50)
+  reference_id      BigInt?
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model provider_reviews {
+  review_id                     BigInt                      @id @default(autoincrement())
+  customerid                    BigInt
+  serviceproviderid             BigInt
+  serviceprovider_engagement_id BigInt?                     @unique
+  engagement_id                 BigInt?                     @unique
+  service_type                  String                      @db.VarChar(50)
+  rating                        Int
+  review                        String?
+  created_at                    DateTime?                   @default(now()) @db.Timestamp(6)
+  customer                      customer                    @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_customer")
+  engagements                   engagements?                @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_engagement")
+  serviceprovider_engagement    serviceprovider_engagement? @relation(fields: [serviceprovider_engagement_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_on_demand")
+  serviceprovider               serviceprovider             @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fk_review_serviceprovider")
+
+  @@index([engagement_id], map: "idx_reviews_engagement")
+  @@index([serviceprovider_engagement_id], map: "idx_reviews_on_demand")
+  @@index([serviceproviderid], map: "idx_reviews_provider")
+}
+
+model provider_wallets {
+  wallet_id                  BigInt           @id @default(autoincrement())
+  serviceproviderid          BigInt?          @unique
+  balance                    Decimal?         @default(0) @db.Decimal(10, 2)
+  security_deposit_collected Decimal?         @default(0) @db.Decimal(10, 2)
+  created_at                 DateTime?        @default(now()) @db.Timestamp(6)
+  serviceprovider            serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This table contains exclusion constraints and requires additional setup for migrations. Visit https://pris.ly/d/exclusion-constraints for more info.
+model provider_weekly_slots {
+  id                BigInt           @id @default(autoincrement())
+  serviceproviderid BigInt?
+  day_of_week       Int              @db.SmallInt
+  slot_start        DateTime         @db.Time(6)
+  slot_end          DateTime         @db.Time(6)
+  is_active         Boolean?         @default(true)
+  start_min         Int?             @default(dbgenerated("((EXTRACT(hour FROM slot_start) * (60)::numeric) + EXTRACT(minute FROM slot_start))"))
+  end_min           Int?             @default(dbgenerated("((EXTRACT(hour FROM slot_end) * (60)::numeric) + EXTRACT(minute FROM slot_end))"))
+  serviceprovider   serviceprovider? @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model service_day_otps {
+  otp_id         BigInt        @id @default(autoincrement())
+  service_day_id BigInt?
+  otp_code       String?       @db.VarChar(6)
+  expires_at     DateTime?     @db.Timestamp(6)
+  verified_at    DateTime?     @db.Timestamp(6)
+  created_at     DateTime      @default(now()) @db.Timestamp(6)
+  service_days   service_days? @relation(fields: [service_day_id], references: [service_day_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([service_day_id], map: "idx_service_day_otps_day")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model service_days {
+  service_day_id   BigInt             @id @default(autoincrement())
+  engagement_id    BigInt
+  service_date     DateTime           @db.Date
+  status           String?            @default("SCHEDULED") @db.VarChar(20)
+  started_at       DateTime?          @db.Timestamp(6)
+  completed_at     DateTime?          @db.Timestamp(6)
+  otp_verified     Boolean?           @default(false)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
+  service_day_otps service_day_otps[]
+
+  @@unique([engagement_id, service_date])
+}
+
+model service_provider_feedback {
+  id                  BigInt          @id @default(autoincrement())
+  feedback            String?         @db.VarChar(255)
+  rating              Float
+  customer_id         BigInt
+  service_provider_id BigInt
+  serviceprovider     serviceprovider @relation(fields: [service_provider_id], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fk6aa0beg2bdnivdc4l7f5jbm0x")
+  customer            customer        @relation(fields: [customer_id], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fkpdcss1mkdj9weqhw901v21diy")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model service_provider_leave {
+  id                                                                        BigInt           @id @default(autoincrement())
+  appliedon                                                                 DateTime?        @db.Date
+  approvedby                                                                Int?
+  approvedon                                                                DateTime?        @db.Date
+  description                                                               String?          @db.VarChar(255)
+  from_date                                                                 DateTime         @db.Date
+  isapproved                                                                Boolean?
+  isbackuprequired                                                          Boolean?
+  iscustomerinformed                                                        Boolean?
+  leavetype                                                                 String?          @db.VarChar(255)
+  no_of_days                                                                Int?
+  to_date                                                                   DateTime         @db.Date
+  backup_by_id                                                              BigInt?
+  serviceproviderid                                                         BigInt
+  serviceprovider_service_provider_leave_backup_by_idToserviceprovider      serviceprovider? @relation("service_provider_leave_backup_by_idToserviceprovider", fields: [backup_by_id], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkexqw5de8by0jq0x2lxuck7ytk")
+  serviceprovider_service_provider_leave_serviceprovideridToserviceprovider serviceprovider  @relation("service_provider_leave_serviceprovideridToserviceprovider", fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkklerl0uho2bw7kdlgnci73y0n")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model service_provider_payment {
+  id                BigInt          @id @default(autoincrement())
+  upiid             String?         @db.VarChar(255)
+  amount            Int
+  currency          String?         @db.VarChar(255)
+  enddate           DateTime        @db.Date
+  month             Int?
+  monthlyamount     Int
+  noofdays          Float
+  paymentmode       String          @db.VarChar(255)
+  paymenton         DateTime?       @db.Date
+  settledon         DateTime?       @db.Timestamp(6)
+  startdate         DateTime        @db.Date
+  transactionid     String          @db.VarChar(255)
+  year              Int?
+  customerid        BigInt
+  serviceproviderid BigInt
+  customer          customer        @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fk2ss67l6nireofb5tga5qhn4vp")
+  serviceprovider   serviceprovider @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkmdrljqodeuvsjpo0ea0co6rot")
+}
+
+model service_provider_request_comments {
+  id                     BigInt                 @id @default(autoincrement())
+  comment                String                 @db.VarChar(255)
+  commented_by           String                 @db.VarChar(255)
+  commented_on           DateTime               @db.Timestamp(6)
+  requestid              BigInt
+  serviceproviderrequest serviceproviderrequest @relation(fields: [requestid], references: [requestid], onDelete: NoAction, onUpdate: NoAction, map: "fkhv0esa2q09eifkhqs5oq5279j")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model serviceprovider {
+  serviceproviderid                                                                BigInt                       @id @default(autoincrement())
+  dob                                                                              DateTime?                    @db.Date
+  kyc                                                                              String?                      @db.VarChar(255)
+  age                                                                              Int?
+  alternateNo                                                                      BigInt?
+  buildingName                                                                     String                       @db.VarChar(255)
+  cookingSpeciality                                                                String?                      @db.VarChar(255)
+  currentLocation                                                                  String?                      @db.VarChar(255)
+  diet                                                                             String?                      @db.VarChar(255)
+  emailId                                                                          String                       @unique(map: "serviceprovider_emailid_key") @db.VarChar(255)
+  enrolleddate                                                                     DateTime?                    @db.Timestamptz(6)
+  experience                                                                       Int?
+  firstName                                                                        String                       @db.VarChar(255)
+  gender                                                                           String?                      @db.VarChar(255)
+  geohash4                                                                         String?                      @db.VarChar(255)
+  geohash5                                                                         String?                      @db.VarChar(255)
+  geohash6                                                                         String?                      @db.VarChar(255)
+  geohash7                                                                         String?                      @db.VarChar(255)
+  housekeepingRole                                                                 String?                      @db.VarChar(255)
+  idno                                                                             String?                      @db.VarChar(255)
+  info                                                                             String?                      @db.VarChar(255)
+  isactive                                                                         Boolean                      @default(true)
+  languageknown                                                                    String?                      @db.VarChar(255)
+  lastName                                                                         String                       @db.VarChar(255)
+  latitude                                                                         Float?
+  locality                                                                         String                       @db.VarChar(255)
+  location                                                                         String?                      @db.VarChar(255)
+  longitude                                                                        Float?
+  middleName                                                                       String?                      @db.VarChar(255)
+  mobileNo                                                                         BigInt                       @unique(map: "ukedeoutrqlypkbdcef08w78bwn")
+  nearbyLocation                                                                   String?                      @db.VarChar(255)
+  pincode                                                                          Int
+  profilepic                                                                       String?                      @db.VarChar(255)
+  rating                                                                           Float                        @default(0)
+  speciality                                                                       String?                      @db.VarChar(255)
+  street                                                                           String                       @db.VarChar(255)
+  timeslot                                                                         String?                      @db.VarChar(255)
+  vendorid                                                                         BigInt?
+  security_deposit_collected                                                       Int?                         @default(0) @db.SmallInt
+  correspondence_apartment                                                         String?                      @db.VarChar(255)
+  correspondence_city                                                              String?                      @db.VarChar(255)
+  correspondence_country                                                           String?                      @db.VarChar(255)
+  correspondence_pincode                                                           String?                      @db.VarChar(255)
+  correspondence_state                                                             String?                      @db.VarChar(255)
+  correspondence_street                                                            String?                      @db.VarChar(255)
+  permanent_apartment                                                              String?                      @db.VarChar(255)
+  permanent_city                                                                   String?                      @db.VarChar(255)
+  permanent_country                                                                String?                      @db.VarChar(255)
+  permanent_pincode                                                                String?                      @db.VarChar(255)
+  permanent_state                                                                  String?                      @db.VarChar(255)
+  permanent_street                                                                 String?                      @db.VarChar(255)
+  keyFacts                                                                         Boolean?
+  correspondence_address_id                                                        BigInt?                      @unique(map: "uk8c38m2dawmd5ks1m0v1mdvaqm")
+  permanent_address_id                                                             BigInt?                      @unique(map: "ukqt70pwr65bckmjmdftw66r40o")
+  kyctype                                                                          String?                      @db.VarChar(50)
+  kycnumber                                                                        String?                      @db.VarChar(50)
+  kycimage                                                                         String?
+  attendance                                                                       attendance[]
+  customerfeedback                                                                 customerfeedback[]
+  engagements                                                                      engagements[]
+  leave_balance                                                                    leave_balance[]
+  payouts                                                                          payouts[]
+  provider_availability                                                            provider_availability[]
+  provider_daily_slots                                                             provider_daily_slots[]
+  provider_leaves                                                                  provider_leaves[]
+  provider_reviews                                                                 provider_reviews[]
+  provider_wallets                                                                 provider_wallets?
+  provider_weekly_slots                                                            provider_weekly_slots[]
+  service_provider_feedback                                                        service_provider_feedback[]
+  service_provider_leave_service_provider_leave_backup_by_idToserviceprovider      service_provider_leave[]     @relation("service_provider_leave_backup_by_idToserviceprovider")
+  service_provider_leave_service_provider_leave_serviceprovideridToserviceprovider service_provider_leave[]     @relation("service_provider_leave_serviceprovideridToserviceprovider")
+  service_provider_payment                                                         service_provider_payment[]
+  address_serviceprovider_correspondence_address_idToaddress                       address?                     @relation("serviceprovider_correspondence_address_idToaddress", fields: [correspondence_address_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk58tpyo1rr5i3r8cd0w35q55ca")
+  address_serviceprovider_permanent_address_idToaddress                            address?                     @relation("serviceprovider_permanent_address_idToaddress", fields: [permanent_address_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkb85jfjip8phenf5g8xkjoqd1n")
+  serviceprovider_engagement                                                       serviceprovider_engagement[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model serviceprovider_engagement {
+  id                  BigInt               @id
+  address             String?              @db.VarChar(255)
+  bookingdate         DateTime             @db.Timestamp(6)
+  bookingtype         String?              @db.VarChar(255)
+  childage            String?              @db.VarChar(255)
+  customername        String?              @db.VarChar(255)
+  enddate             DateTime?            @db.Date
+  engagements         String?              @db.VarChar(255)
+  experience          String?              @db.VarChar(255)
+  housekeepingrole    String?              @db.VarChar(255)
+  isactive            Boolean
+  mealtype            String?              @db.VarChar(255)
+  monthlyamount       Float?
+  noofpersons         String?              @db.VarChar(255)
+  paymentmode         String?              @db.VarChar(255)
+  responsibilities    String?
+  user_role           String?              @db.VarChar(255)
+  serviceprovidername String?              @db.VarChar(255)
+  startdate           DateTime             @db.Date
+  taskstatus          String               @db.VarChar(255)
+  timeslot            String?              @db.VarChar(50)
+  customerid          BigInt
+  serviceproviderid   BigInt?
+  servicetype         String?              @db.VarChar(255)
+  housekeeping_role   String?              @db.VarChar(255)
+  modified_date       DateTime?            @db.Timestamp(6)
+  modified_by         String?              @db.VarChar(255)
+  booking_transaction booking_transaction?
+  customer_holidays   customer_holidays[]
+  provider_reviews    provider_reviews?
+  serviceprovider     serviceprovider?     @relation(fields: [serviceproviderid], references: [serviceproviderid], onDelete: NoAction, onUpdate: NoAction, map: "fkh2c2wulrpu6ymcxnkkhiqnsyl")
+  customer            customer             @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fkl0h091exkleq4l5p7wsyfnhvw")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model serviceproviderrequest {
+  requestid                         BigInt                              @id
+  age                               Int?
+  createdon                         DateTime                            @db.Timestamp(6)
+  gender                            String?                             @db.VarChar(255)
+  housekeepingrole                  String                              @db.VarChar(255)
+  ispotential                       String                              @db.VarChar(255)
+  isresolved                        String                              @db.VarChar(255)
+  modifiedon                        DateTime                            @db.Timestamp(6)
+  resolvedby                        BigInt?
+  resolvedon                        DateTime?                           @db.Timestamp(6)
+  serviceproviderid                 BigInt?
+  supervisorid                      BigInt?
+  timeslotlist                      String                              @db.VarChar(255)
+  service_provider_request_comments service_provider_request_comments[]
+}
+
+model shortlisted_service_provider {
+  id                    BigInt   @id @default(autoincrement())
+  serviceprovideridlist String?  @db.VarChar(255)
+  customerid            BigInt
+  customer              customer @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "fksbh28v3wreh5afqrigysdyvki")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_credentials {
+  username       String    @id @db.VarChar(255)
+  disable_till   DateTime? @db.Timestamp(6)
+  is_active      Boolean
+  is_temp_locked Boolean
+  last_login     DateTime? @db.Timestamp(6)
+  no_of_tries    Int
+  password       String    @db.VarChar(255)
+  phone_number   String?   @unique(map: "ukffrnqq2cgqiv3nqlw6vmw5sx0") @db.VarChar(10)
+  user_role      String?   @db.VarChar(255)
+}
+
+model users {
+  user_id    String    @id @db.VarChar(50)
+  first_name String    @db.VarChar(100)
+  last_name  String    @db.VarChar(100)
+  email      String    @unique @db.VarChar(150)
+  password   String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model vendor {
+  vendorid       BigInt    @id @default(autoincrement())
+  address        String    @db.VarChar(255)
+  companyname    String    @db.VarChar(255)
+  createddate    DateTime? @default(now()) @db.Timestamp(6)
+  emailid        String    @unique @db.VarChar(255)
+  isactive       Boolean?  @default(true)
+  phoneno        String    @db.VarChar(20)
+  registrationid String?   @db.VarChar(255)
+}
+
+model wallet_transaction {
+  transaction_id   BigInt            @id(map: "wallet_transactions_pkey") @default(autoincrement())
+  customerid       BigInt?
+  engagement_id    BigInt?
+  transaction_type String            @db.VarChar(50)
+  amount           Decimal           @db.Decimal(12, 2)
+  description      String?
+  balance_after    Decimal?          @db.Decimal(12, 2)
+  created_at       DateTime?         @default(now()) @db.Timestamp(6)
+  wallet_id        BigInt?
+  reason           String?
+  customer         customer?         @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "wallet_transactions_customerid_fkey")
+  engagements      engagements?      @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction, map: "wallet_transactions_engagement_id_fkey")
+  customer_wallets customer_wallets? @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction, map: "wallet_transactions_wallet_id_fkey")
+}
+
+model wallet_transactions {
+  transaction_id   BigInt       @id(map: "wallet_transactions_pkey1") @default(autoincrement())
+  customerid       BigInt?
+  engagement_id    BigInt?
+  transaction_type String       @db.VarChar(50)
+  amount           Decimal      @db.Decimal(12, 2)
+  description      String?
+  balance_after    Decimal?     @db.Decimal(12, 2)
+  created_at       DateTime?    @default(now()) @db.Timestamp(6)
+  customer         customer?    @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "wallet_transactions_customerid_fkey1")
+  engagements      engagements? @relation(fields: [engagement_id], references: [engagement_id], onDelete: NoAction, onUpdate: NoAction, map: "wallet_transactions_engagement_id_fkey1")
+}
+
+model wallets {
+  wallet_id  BigInt    @id(map: "wallets_pkey1") @default(autoincrement())
+  customerid BigInt?   @unique(map: "wallets_customerid_key1")
+  balance    Decimal?  @default(0) @db.Decimal(10, 2)
+  customer   customer? @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "wallets_customerid_fkey1")
+}
+
+enum enum_coupons_discount_type {
+  PERCENTAGE
+  FLAT
+}
+
+enum enum_coupons_service_type {
+  COOK
+  MAID
+  NANNY
+}

@@ -1,9 +1,33 @@
-const errorHandler = (err, req, res, next) => {
-  console.error("Error:", err);
+import { observeApiError } from "../monitoring/prometheus.js";
+import { logger } from "../utils/logger.js";
 
-  res.status(err.status || 500).json({
+const errorHandler = (err, req, res, next) => {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const status = err.status || 500;
+  const code = err.code || "INTERNAL_ERROR";
+
+  observeApiError({
+    method: req.method,
+    route: req.route?.path || req.path || req.originalUrl,
+    statusCode: status,
+    code,
+  });
+
+  logger.error("[api.error]", {
+    requestId,
+    method: req.method,
+    path: req.originalUrl,
+    status,
+    code,
+    message: err.message,
+  });
+
+  res.status(status).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    code,
+    message: err.userMessage || "Something went wrong. Please try again.",
+    debugMessage: err.message || "Internal Server Error",
+    requestId,
     errors: err.errors || null
   });
 };
