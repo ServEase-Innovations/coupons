@@ -70,6 +70,15 @@
  *               city:
  *                 type: string
  *                 example: Bangalore
+ *               booking_condition:
+ *                 type: string
+ *                 enum: [ANY, FIRST_BOOKING, NTH_BOOKING]
+ *                 description: ANY = all customers; FIRST_BOOKING = no prior engagements; NTH_BOOKING = requires nth_booking (e.g. 5 = customer’s 5th booking).
+ *                 example: FIRST_BOOKING
+ *               nth_booking:
+ *                 type: integer
+ *                 description: Required when booking_condition is NTH_BOOKING (e.g. 5 for 5th booking — customer must already have 4 engagements).
+ *                 example: 5
  *     responses:
  *       201:
  *         description: Coupon created successfully
@@ -85,6 +94,43 @@
  *     responses:
  *       200:
  *         description: List of coupons
+ */
+/**
+ * @swagger
+ * /api/coupons/id/{coupon_id}:
+ *   get:
+ *     summary: Get coupon by ID
+ *     tags: [Coupons]
+ *     parameters:
+ *       - in: path
+ *         name: coupon_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Coupon details
+ *       404:
+ *         description: Coupon not found
+ */
+/**
+ * @swagger
+ * /api/coupons/customer/{customer_id}:
+ *   get:
+ *     summary: List coupons applicable to a customer by booking index
+ *     description: Uses engagement count for this customer as prior bookings. Returns active, in-window coupons matching FIRST_BOOKING, NTH_BOOKING, or ANY. Does not filter by city/service — validate endpoint applies those rules.
+ *     tags: [Coupons]
+ *     parameters:
+ *       - in: path
+ *         name: customer_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 123
+ *     responses:
+ *       200:
+ *         description: prior_booking_count, next_booking_number, and coupons array
  */
 /**
  * @swagger

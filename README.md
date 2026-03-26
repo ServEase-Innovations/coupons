@@ -65,16 +65,46 @@ App endpoints:
 
 - API root: `http://localhost:3000/`
 - Swagger docs: `http://localhost:3000/api-docs`
+- OpenAPI JSON (dynamic server URL): `http://localhost:3000/api-docs.json`
 - Metrics endpoint: `http://localhost:3000/metrics`
+
+### Swagger “servers” URL on AWS EC2 / behind nginx or ALB
+
+Swagger’s base URL is chosen **per request**:
+
+1. If you set **`SWAGGER_SERVER_URL`** or **`APP_URL`** / **`BASE_URL`** / **`PUBLIC_URL`**, that value is used (best if you use a fixed domain).
+2. Otherwise it uses **`Host`** plus **`X-Forwarded-Proto`** (or **`X-Forwarded-Host`**) so it matches how the client opened the docs (works on EC2 behind a load balancer or reverse proxy).
+
+Ensure your proxy forwards headers, for example:
+
+- `X-Forwarded-Proto` (https when TLS terminates at ALB/nginx)
+- `Host` or `X-Forwarded-Host`
 
 ## Coupon APIs
 
 Base path: `/api/coupons`
 
-- `POST /create` - create coupon
+- `POST /create` - create coupon (optional `booking_condition`, `nth_booking`)
 - `GET /all` - list active coupons
+- `GET /id/:coupon_id` - get one coupon by UUID
+- `GET /customer/:customer_id` - coupons applicable to this customer (by engagement/booking count + date window)
 - `PUT /update/:coupon_id` - update coupon by ID
 - `DELETE /delete/:coupon_code` - deactivate coupon
+
+### Booking-based coupons (admin)
+
+When creating/updating a coupon:
+
+- `booking_condition`: `ANY` (default) | `FIRST_BOOKING` | `NTH_BOOKING`
+- `nth_booking`: required if `NTH_BOOKING` — e.g. `5` means the customer’s **5th** booking (they must already have **4** rows in `engagements`).
+
+`validate` / `reserve` enforce the same rules using `engagements` count for `customer_id`.
+
+Apply DB migration for new columns:
+
+```bash
+npx prisma db execute --file prisma/migrations/20260326000000_coupon_booking_conditions/migration.sql
+```
 
 ## Redemption APIs (customer checkout flow)
 

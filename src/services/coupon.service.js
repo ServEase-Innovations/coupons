@@ -145,6 +145,55 @@ const assertCouponEligibility = ({
   }
 };
 
+/** Count engagements for customer — used as “prior bookings” before the current checkout. */
+export const countCustomerPriorBookings = async (customerId, tx = prisma) => {
+  return tx.engagements.count({
+    where: { customerid: customerId },
+  });
+};
+
+const getBookingCondition = (coupon) =>
+  (coupon.booking_condition || "ANY").toUpperCase();
+
+/**
+ * FIRST_BOOKING: customer has no engagements yet (0 prior bookings).
+ * NTH_BOOKING: customer has exactly (nth_booking - 1) engagements (next booking is nth).
+ * ANY: no booking-index restriction.
+ */
+export const matchesBookingCondition = (coupon, priorBookingCount) => {
+  const cond = getBookingCondition(coupon);
+  if (cond === "ANY" || !cond) return true;
+  if (cond === "FIRST_BOOKING") return priorBookingCount === 0;
+  if (cond === "NTH_BOOKING") {
+    const n = coupon.nth_booking;
+    if (n === null || n === undefined || n < 1) return false;
+    return priorBookingCount === n - 1;
+  }
+  return true;
+};
+
+const assertBookingCondition = (coupon, priorBookingCount) => {
+  if (!matchesBookingCondition(coupon, priorBookingCount)) {
+    const cond = getBookingCondition(coupon);
+    if (cond === "FIRST_BOOKING") {
+      throw createHttpError(
+        "Coupon only valid for first booking",
+        400,
+        "COUPON_FIRST_BOOKING_ONLY",
+        "This offer is only for your first booking."
+      );
+    }
+    if (cond === "NTH_BOOKING") {
+      throw createHttpError(
+        "Coupon not valid for this booking number",
+        400,
+        "COUPON_NTH_BOOKING_MISMATCH",
+        `This offer applies only on booking #${coupon.nth_booking}.`
+      );
+    }
+  }
+};
+
 // Create coupon
 export const createCoupon = async (data) => {
   const normalized = normalizeCouponDates(data);
@@ -153,6 +202,24 @@ export const createCoupon = async (data) => {
   if (normalized.created_at === undefined) {
     normalized.created_at = new Date();
   }
+
+  if (!normalized.booking_condition) {
+    normalized.booking_condition = "ANY";
+  }
+  const bc = String(normalized.booking_condition).toUpperCase();
+  if (bc === "NTH_BOOKING") {
+    const n = normalized.nth_booking;
+    if (n === undefined || n === null || Number(n) < 1) {
+      throw createHttpError(
+        "nth_booking is required when booking_condition is NTH_BOOKING",
+        400,
+        "COUPON_INVALID_NTH",
+        "For “Nth booking” coupons, set nth_booking (e.g. 5 for 5th booking)."
+      );
+    }
+    normalized.nth_booking = Number(n);
+  }
+  normalized.booking_condition = bc;
 
   logger.info("[coupon.create] creating coupon", {
     coupon_code: normalized.coupon_code,
@@ -165,6 +232,51 @@ export const getAllCoupons = async () => {
   return await prisma.coupon.findMany({
     where: { isActive: true },
   });
+};
+
+export const getCouponById = async (couponId) => {
+  const coupon = await prisma.coupon.findUnique({
+    where: { coupon_id: couponId },
+  });
+  if (!coupon) {
+    throw createHttpError(
+      "Coupon not found",
+      404,
+      "COUPON_NOT_FOUND",
+      "Coupon not found."
+    );
+  }
+  return coupon;
+};
+
+/**
+ * Active coupons in date window that match this customer’s booking index
+ * (from engagements count). Does not check usage limits or city/service — use validate for that.
+ */
+export const getCouponsForCustomer = async (customerIdRaw) => {
+  const customerId = getCustomerId(customerIdRaw);
+  const now = new Date();
+  const priorBookingCount = await countCustomerPriorBookings(customerId);
+
+  const coupons = await prisma.coupon.findMany({
+    where: {
+      isActive: true,
+      start_date: { lte: now },
+      end_date: { gte: now },
+    },
+    orderBy: { created_at: "desc" },
+  });
+
+  const applicable = coupons.filter((c) =>
+    matchesBookingCondition(c, priorBookingCount)
+  );
+
+  return {
+    customer_id: customerId.toString(),
+    prior_booking_count: priorBookingCount,
+    next_booking_number: priorBookingCount + 1,
+    coupons: applicable,
+  };
 };
 
 // Soft delete coupon
@@ -191,9 +303,25 @@ export const softDeleteCoupon = async (couponCode) => {
 };
 // Update coupon by coupon_id
 export const updateCouponById = async (couponId, data) => {
+  const patch = normalizeCouponDates(data);
+  if (patch.booking_condition !== undefined) {
+    patch.booking_condition = String(patch.booking_condition).toUpperCase();
+  }
+  if (patch.booking_condition === "NTH_BOOKING") {
+    const n = patch.nth_booking;
+    if (n === undefined || n === null || Number(n) < 1) {
+      throw createHttpError(
+        "nth_booking is required when booking_condition is NTH_BOOKING",
+        400,
+        "COUPON_INVALID_NTH",
+        "For “Nth booking” coupons, set nth_booking (e.g. 5 for 5th booking)."
+      );
+    }
+    patch.nth_booking = Number(n);
+  }
   return await prisma.coupon.update({
     where: { coupon_id: couponId },
-    data: normalizeCouponDates(data),
+    data: patch,
   });
 };
 
@@ -215,18 +343,20 @@ export const validateCoupon = async ({
   const orderValue = Number(order_value) || 0;
   const customerId = getCustomerId(customer_id);
 
-  const [totalAppliedCount, customerAppliedCount] = await Promise.all([
-    prisma.coupon_redemptions.count({
-      where: { coupon_id: coupon?.coupon_id, status: "APPLIED" },
-    }),
-    prisma.coupon_redemptions.count({
-      where: {
-        coupon_id: coupon?.coupon_id,
-        customer_id: customerId,
-        status: "APPLIED",
-      },
-    }),
-  ]);
+  const [totalAppliedCount, customerAppliedCount, priorBookingCount] =
+    await Promise.all([
+      prisma.coupon_redemptions.count({
+        where: { coupon_id: coupon?.coupon_id, status: "APPLIED" },
+      }),
+      prisma.coupon_redemptions.count({
+        where: {
+          coupon_id: coupon?.coupon_id,
+          customer_id: customerId,
+          status: "APPLIED",
+        },
+      }),
+      countCustomerPriorBookings(customerId),
+    ]);
 
   assertCouponEligibility({
     coupon,
@@ -237,6 +367,7 @@ export const validateCoupon = async ({
     totalAppliedCount,
     customerAppliedCount,
   });
+  assertBookingCondition(coupon, priorBookingCount);
 
   const discountAmount = getDiscountAmount(coupon, orderValue);
 
@@ -246,6 +377,8 @@ export const validateCoupon = async ({
     coupon_code: coupon.coupon_code,
     discount_amount: discountAmount,
     final_amount: Math.max(orderValue - discountAmount, 0),
+    prior_booking_count: priorBookingCount,
+    next_booking_number: priorBookingCount + 1,
   };
 };
 
@@ -290,18 +423,20 @@ export const reserveCoupon = async ({
       FOR UPDATE
     `;
 
-    const [totalAppliedCount, customerAppliedCount] = await Promise.all([
-      tx.coupon_redemptions.count({
-        where: { coupon_id: coupon.coupon_id, status: "APPLIED" },
-      }),
-      tx.coupon_redemptions.count({
-        where: {
-          coupon_id: coupon.coupon_id,
-          customer_id: customerId,
-          status: "APPLIED",
-        },
-      }),
-    ]);
+    const [totalAppliedCount, customerAppliedCount, priorBookingCount] =
+      await Promise.all([
+        tx.coupon_redemptions.count({
+          where: { coupon_id: coupon.coupon_id, status: "APPLIED" },
+        }),
+        tx.coupon_redemptions.count({
+          where: {
+            coupon_id: coupon.coupon_id,
+            customer_id: customerId,
+            status: "APPLIED",
+          },
+        }),
+        countCustomerPriorBookings(customerId, tx),
+      ]);
 
     assertCouponEligibility({
       coupon,
@@ -312,6 +447,7 @@ export const reserveCoupon = async ({
       totalAppliedCount,
       customerAppliedCount,
     });
+    assertBookingCondition(coupon, priorBookingCount);
 
     const discountAmount = getDiscountAmount(coupon, orderValue);
 

@@ -23,6 +23,8 @@ model Coupon {
   city                String?                    @db.VarChar(255)
   isActive            Boolean?                   @default(true)
   created_at          DateTime?                  @db.Timestamptz(6)
+  booking_condition   String?                    @default("ANY") @db.VarChar(30)
+  nth_booking         Int?
   coupon_redemptions  coupon_redemptions[]
 
   @@map("coupons")

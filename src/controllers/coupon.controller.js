@@ -35,6 +35,41 @@ export const getCoupons = async (req, res, next) => {
   }
 };
 
+export const getCouponById = async (req, res, next) => {
+  try {
+    const coupon = await couponService.getCouponById(req.params.coupon_id);
+    observeCouponAction({ action: "get_coupon_by_id", result: "success" });
+    res.json({
+      success: true,
+      message: "Coupon fetched successfully.",
+      data: coupon,
+    });
+  } catch (error) {
+    observeCouponAction({ action: "get_coupon_by_id", result: "failure" });
+    next(error);
+  }
+};
+
+export const getCouponsForCustomer = async (req, res, next) => {
+  try {
+    const data = await couponService.getCouponsForCustomer(
+      req.params.customer_id
+    );
+    observeCouponAction({ action: "get_coupons_for_customer", result: "success" });
+    res.json({
+      success: true,
+      message: "Applicable coupons for this customer.",
+      data,
+    });
+  } catch (error) {
+    observeCouponAction({
+      action: "get_coupons_for_customer",
+      result: "failure",
+    });
+    next(error);
+  }
+};
+
 export const deleteCoupon = async (req, res, next) => {
   try {
     const result = await couponService.softDeleteCoupon(

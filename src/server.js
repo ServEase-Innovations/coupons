@@ -7,6 +7,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import requestMetrics from "./middleware/requestMetrics.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./swagger/swagger.js";
+import { resolveSwaggerServerUrl } from "./utils/swaggerServerUrl.js";
 import { getMetrics, metricsContentType } from "./monitoring/prometheus.js";
 import { logger } from "./utils/logger.js";
 
@@ -48,8 +49,19 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/coupons", couponRoutes);
 
-// Swagger UI
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger UI — server URL follows the request (EC2 / ALB / nginx) unless APP_URL etc. is set
+app.use("/api-docs", swaggerUi.serve);
+app.get("/api-docs", (req, res, next) => {
+  const spec = JSON.parse(JSON.stringify(swaggerSpec));
+  spec.servers = [{ url: resolveSwaggerServerUrl(req) }];
+  swaggerUi.setup(spec)(req, res, next);
+});
+
+app.get("/api-docs.json", (req, res) => {
+  const spec = JSON.parse(JSON.stringify(swaggerSpec));
+  spec.servers = [{ url: resolveSwaggerServerUrl(req) }];
+  res.json(spec);
+});
 
 app.get("/metrics", async (req, res, next) => {
   try {
