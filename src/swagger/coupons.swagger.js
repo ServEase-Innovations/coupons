@@ -70,15 +70,6 @@
  *               city:
  *                 type: string
  *                 example: Bangalore
- *               booking_condition:
- *                 type: string
- *                 enum: [ANY, FIRST_BOOKING, NTH_BOOKING]
- *                 description: ANY = all customers; FIRST_BOOKING = no prior engagements; NTH_BOOKING = requires nth_booking (e.g. 5 = customer’s 5th booking).
- *                 example: FIRST_BOOKING
- *               nth_booking:
- *                 type: integer
- *                 description: Required when booking_condition is NTH_BOOKING (e.g. 5 for 5th booking — customer must already have 4 engagements).
- *                 example: 5
  *     responses:
  *       201:
  *         description: Coupon created successfully

@@ -1,36 +1,32 @@
+import { Op, Transaction } from "sequelize";
+import { sequelize } from "../config/db.js";
+import { Coupon } from "../models/coupon.model.js";
+import { CouponRedemption } from "../models/coupon_redemption.model.js";
 import { prisma } from "../config/prisma.js";
-import prismaPkg from "@prisma/client";
 import { logger } from "../utils/logger.js";
 
-const { Prisma } = prismaPkg;
-
-const toPrismaDateTime = (value) => {
+const toDate = (value) => {
   if (!value) return value;
   if (value instanceof Date) return value;
   if (typeof value !== "string") return value;
-
-  // Accept "YYYY-MM-DD" and convert to ISO datetime for Prisma DateTime.
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return new Date(`${value}T00:00:00.000Z`);
   }
-
   return new Date(value);
 };
 
 const normalizeCouponDates = (data = {}) => {
   const normalized = { ...data };
 
-  // If the caller sends null, omit the field so DB defaults apply.
   if (normalized.created_at === null) delete normalized.created_at;
   if (normalized.coupon_id === null) delete normalized.coupon_id;
   if (normalized.isActive === null) delete normalized.isActive;
 
   if ("start_date" in normalized) {
-    normalized.start_date = toPrismaDateTime(normalized.start_date);
+    normalized.start_date = toDate(normalized.start_date);
   }
-
   if ("end_date" in normalized) {
-    normalized.end_date = toPrismaDateTime(normalized.end_date);
+    normalized.end_date = toDate(normalized.end_date);
   }
 
   return normalized;
@@ -82,7 +78,7 @@ const assertCouponEligibility = ({
     );
   }
 
-  if (now < coupon.start_date || now > coupon.end_date) {
+  if (now < new Date(coupon.start_date) || now > new Date(coupon.end_date)) {
     throw createHttpError(
       "Coupon is outside active date range",
       400,
@@ -145,21 +141,15 @@ const assertCouponEligibility = ({
   }
 };
 
-/** Count engagements for customer — used as “prior bookings” before the current checkout. */
-export const countCustomerPriorBookings = async (customerId, tx = prisma) => {
-  return tx.engagements.count({
+export const countCustomerPriorBookings = async (customerId) => {
+  return prisma.engagements.count({
     where: { customerid: customerId },
   });
 };
 
 const getBookingCondition = (coupon) =>
-  (coupon.booking_condition || "ANY").toUpperCase();
+  (coupon.booking_condition || "ANY").toString().toUpperCase();
 
-/**
- * FIRST_BOOKING: customer has no engagements yet (0 prior bookings).
- * NTH_BOOKING: customer has exactly (nth_booking - 1) engagements (next booking is nth).
- * ANY: no booking-index restriction.
- */
 export const matchesBookingCondition = (coupon, priorBookingCount) => {
   const cond = getBookingCondition(coupon);
   if (cond === "ANY" || !cond) return true;
@@ -194,51 +184,34 @@ const assertBookingCondition = (coupon, priorBookingCount) => {
   }
 };
 
-// Create coupon
 export const createCoupon = async (data) => {
   const normalized = normalizeCouponDates(data);
 
-  // Your existing DB appears to allow null for created_at, so we set it explicitly.
   if (normalized.created_at === undefined) {
     normalized.created_at = new Date();
   }
 
-  if (!normalized.booking_condition) {
-    normalized.booking_condition = "ANY";
-  }
-  const bc = String(normalized.booking_condition).toUpperCase();
-  if (bc === "NTH_BOOKING") {
-    const n = normalized.nth_booking;
-    if (n === undefined || n === null || Number(n) < 1) {
-      throw createHttpError(
-        "nth_booking is required when booking_condition is NTH_BOOKING",
-        400,
-        "COUPON_INVALID_NTH",
-        "For “Nth booking” coupons, set nth_booking (e.g. 5 for 5th booking)."
-      );
-    }
-    normalized.nth_booking = Number(n);
-  }
-  normalized.booking_condition = bc;
+  // DB may not have these columns yet — ignore if client sends them
+  delete normalized.booking_condition;
+  delete normalized.nth_booking;
 
   logger.info("[coupon.create] creating coupon", {
     coupon_code: normalized.coupon_code,
   });
-  return await prisma.coupon.create({ data: normalized });
+  const row = await Coupon.create(normalized);
+  return row.get({ plain: true });
 };
 
-// Get all coupons
 export const getAllCoupons = async () => {
-  return await prisma.coupon.findMany({
+  const rows = await Coupon.findAll({
     where: { isActive: true },
   });
+  return rows.map((r) => r.get({ plain: true }));
 };
 
 export const getCouponById = async (couponId) => {
-  const coupon = await prisma.coupon.findUnique({
-    where: { coupon_id: couponId },
-  });
-  if (!coupon) {
+  const row = await Coupon.findByPk(couponId);
+  if (!row) {
     throw createHttpError(
       "Coupon not found",
       404,
@@ -246,42 +219,37 @@ export const getCouponById = async (couponId) => {
       "Coupon not found."
     );
   }
-  return coupon;
+  return row.get({ plain: true });
 };
 
-/**
- * Active coupons in date window that match this customer’s booking index
- * (from engagements count). Does not check usage limits or city/service — use validate for that.
- */
 export const getCouponsForCustomer = async (customerIdRaw) => {
   const customerId = getCustomerId(customerIdRaw);
   const now = new Date();
   const priorBookingCount = await countCustomerPriorBookings(customerId);
 
-  const coupons = await prisma.coupon.findMany({
+  const rows = await Coupon.findAll({
     where: {
       isActive: true,
-      start_date: { lte: now },
-      end_date: { gte: now },
+      start_date: { [Op.lte]: now },
+      end_date: { [Op.gte]: now },
     },
-    orderBy: { created_at: "desc" },
+    order: [["created_at", "DESC"]],
   });
 
-  const applicable = coupons.filter((c) =>
-    matchesBookingCondition(c, priorBookingCount)
-  );
+  const coupons = rows
+    .map((r) => r.get({ plain: true }))
+    .filter((c) => matchesBookingCondition(c, priorBookingCount));
 
   return {
     customer_id: customerId.toString(),
     prior_booking_count: priorBookingCount,
     next_booking_number: priorBookingCount + 1,
-    coupons: applicable,
+    coupons,
   };
 };
 
-// Soft delete coupon
 export const softDeleteCoupon = async (couponCode) => {
-  const coupon = await prisma.coupon.findFirst({
+  const coupon = await Coupon.findOne({
     where: { coupon_code: couponCode, isActive: true },
   });
 
@@ -294,35 +262,29 @@ export const softDeleteCoupon = async (couponCode) => {
     );
   }
 
-  await prisma.coupon.update({
-    where: { coupon_id: coupon.coupon_id },
-    data: { isActive: false },
-  });
+  await coupon.update({ isActive: false });
 
   return { message: "Coupon deleted successfully" };
 };
-// Update coupon by coupon_id
+
 export const updateCouponById = async (couponId, data) => {
   const patch = normalizeCouponDates(data);
-  if (patch.booking_condition !== undefined) {
-    patch.booking_condition = String(patch.booking_condition).toUpperCase();
-  }
-  if (patch.booking_condition === "NTH_BOOKING") {
-    const n = patch.nth_booking;
-    if (n === undefined || n === null || Number(n) < 1) {
-      throw createHttpError(
-        "nth_booking is required when booking_condition is NTH_BOOKING",
-        400,
-        "COUPON_INVALID_NTH",
-        "For “Nth booking” coupons, set nth_booking (e.g. 5 for 5th booking)."
-      );
-    }
-    patch.nth_booking = Number(n);
-  }
-  return await prisma.coupon.update({
+  delete patch.booking_condition;
+  delete patch.nth_booking;
+
+  const [updated] = await Coupon.update(patch, {
     where: { coupon_id: couponId },
-    data: patch,
   });
+  if (!updated) {
+    throw createHttpError(
+      "Coupon not found",
+      404,
+      "COUPON_NOT_FOUND",
+      "Coupon not found."
+    );
+  }
+  const row = await Coupon.findByPk(couponId);
+  return row.get({ plain: true });
 };
 
 export const validateCoupon = async ({
@@ -338,23 +300,29 @@ export const validateCoupon = async ({
     service_type,
     city,
   });
-  const coupon = await prisma.coupon.findUnique({ where: { coupon_code } });
+
+  const row = await Coupon.findOne({ where: { coupon_code } });
+  const coupon = row ? row.get({ plain: true }) : null;
   const now = new Date();
   const orderValue = Number(order_value) || 0;
   const customerId = getCustomerId(customer_id);
 
   const [totalAppliedCount, customerAppliedCount, priorBookingCount] =
     await Promise.all([
-      prisma.coupon_redemptions.count({
-        where: { coupon_id: coupon?.coupon_id, status: "APPLIED" },
-      }),
-      prisma.coupon_redemptions.count({
-        where: {
-          coupon_id: coupon?.coupon_id,
-          customer_id: customerId,
-          status: "APPLIED",
-        },
-      }),
+      coupon
+        ? CouponRedemption.count({
+            where: { coupon_id: coupon.coupon_id, status: "APPLIED" },
+          })
+        : 0,
+      coupon
+        ? CouponRedemption.count({
+            where: {
+              coupon_id: coupon.coupon_id,
+              user_id: customerId,
+              status: "APPLIED",
+            },
+          })
+        : 0,
       countCustomerPriorBookings(customerId),
     ]);
 
@@ -396,6 +364,7 @@ export const reserveCoupon = async ({
     customer_id,
     engagement_id,
   });
+
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
   const orderValue = Number(order_value) || 0;
@@ -405,9 +374,14 @@ export const reserveCoupon = async ({
       ? null
       : BigInt(engagement_id);
 
-  return await prisma.$transaction(async (tx) => {
-    const coupon = await tx.coupon.findUnique({ where: { coupon_code } });
-    if (!coupon) {
+  return sequelize.transaction(async (transaction) => {
+    const locked = await Coupon.findOne({
+      where: { coupon_code },
+      transaction,
+      lock: Transaction.LOCK.UPDATE,
+    });
+
+    if (!locked) {
       throw createHttpError(
         "Coupon not found",
         404,
@@ -416,26 +390,23 @@ export const reserveCoupon = async ({
       );
     }
 
-    await tx.$queryRaw`
-      SELECT coupon_id
-      FROM coupons
-      WHERE coupon_id = ${coupon.coupon_id}::uuid
-      FOR UPDATE
-    `;
+    const coupon = locked.get({ plain: true });
 
     const [totalAppliedCount, customerAppliedCount, priorBookingCount] =
       await Promise.all([
-        tx.coupon_redemptions.count({
+        CouponRedemption.count({
           where: { coupon_id: coupon.coupon_id, status: "APPLIED" },
+          transaction,
         }),
-        tx.coupon_redemptions.count({
+        CouponRedemption.count({
           where: {
             coupon_id: coupon.coupon_id,
-            customer_id: customerId,
+            user_id: customerId,
             status: "APPLIED",
           },
+          transaction,
         }),
-        countCustomerPriorBookings(customerId, tx),
+        countCustomerPriorBookings(customerId),
       ]);
 
     assertCouponEligibility({
@@ -452,19 +423,21 @@ export const reserveCoupon = async ({
     const discountAmount = getDiscountAmount(coupon, orderValue);
 
     try {
-      return await tx.coupon_redemptions.create({
-        data: {
+      const created = await CouponRedemption.create(
+        {
           coupon_id: coupon.coupon_id,
-          customer_id: customerId,
+          user_id: customerId,
           engagement_id: engagementId,
           status: "RESERVED",
           discount_amount: discountAmount,
           expires_at: expiresAt,
-          metadata: metadata ?? Prisma.JsonNull,
+          metadata: metadata ?? null,
         },
-      });
+        { transaction }
+      );
+      return created.get({ plain: true });
     } catch (error) {
-      if (error.code === "P2002") {
+      if (error.name === "SequelizeUniqueConstraintError") {
         throw createHttpError(
           "Coupon is already reserved for this order",
           409,
@@ -480,11 +453,8 @@ export const reserveCoupon = async ({
 export const confirmCoupon = async ({ redemption_id }) => {
   logger.info("[coupon.confirm] confirming redemption", { redemption_id });
   const now = new Date();
-  const redemption = await prisma.coupon_redemptions.findUnique({
-    where: { redemption_id },
-    include: { coupons: true },
-  });
 
+  const redemption = await CouponRedemption.findByPk(redemption_id);
   if (!redemption) {
     throw createHttpError(
       "Coupon reservation not found",
@@ -493,7 +463,9 @@ export const confirmCoupon = async ({ redemption_id }) => {
       "Coupon reservation not found."
     );
   }
-  if (redemption.status !== "RESERVED") {
+
+  const row = redemption.get({ plain: true });
+  if (row.status !== "RESERVED") {
     throw createHttpError(
       "Only reserved coupons can be confirmed",
       400,
@@ -501,7 +473,7 @@ export const confirmCoupon = async ({ redemption_id }) => {
       "Only reserved coupons can be confirmed."
     );
   }
-  if (redemption.expires_at < now) {
+  if (new Date(row.expires_at) < now) {
     throw createHttpError(
       "Coupon reservation expired",
       400,
@@ -510,21 +482,19 @@ export const confirmCoupon = async ({ redemption_id }) => {
     );
   }
 
-  return await prisma.coupon_redemptions.update({
-    where: { redemption_id },
-    data: {
-      status: "APPLIED",
-      applied_at: now,
-    },
+  await redemption.update({
+    status: "APPLIED",
+    applied_at: now,
   });
+
+  const updated = await CouponRedemption.findByPk(redemption_id);
+  return updated.get({ plain: true });
 };
 
 export const releaseCoupon = async ({ redemption_id }) => {
   logger.info("[coupon.release] releasing redemption", { redemption_id });
-  const redemption = await prisma.coupon_redemptions.findUnique({
-    where: { redemption_id },
-  });
 
+  const redemption = await CouponRedemption.findByPk(redemption_id);
   if (!redemption) {
     throw createHttpError(
       "Coupon reservation not found",
@@ -533,7 +503,9 @@ export const releaseCoupon = async ({ redemption_id }) => {
       "Coupon reservation not found."
     );
   }
-  if (redemption.status !== "RESERVED") {
+
+  const row = redemption.get({ plain: true });
+  if (row.status !== "RESERVED") {
     throw createHttpError(
       "Only reserved coupons can be released",
       400,
@@ -542,11 +514,11 @@ export const releaseCoupon = async ({ redemption_id }) => {
     );
   }
 
-  return await prisma.coupon_redemptions.update({
-    where: { redemption_id },
-    data: {
-      status: "RELEASED",
-      released_at: new Date(),
-    },
+  await redemption.update({
+    status: "RELEASED",
+    released_at: new Date(),
   });
+
+  const updated = await CouponRedemption.findByPk(redemption_id);
+  return updated.get({ plain: true });
 };

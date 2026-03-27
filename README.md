@@ -212,11 +212,27 @@ tail -f logs/app.log
   - Ensure `promtail` and `loki` containers are up
 - Metrics empty
   - Hit API endpoints first; counters increase with traffic
+- API returns `DATABASE_SCHEMA_OUT_OF_SYNC` / Prisma `P2022` (“column does not exist”)
+  - Your deployed database is behind the Prisma schema. Set `DATABASE_URL` to the **same** DB the app uses, then run:
+
+```bash
+npm run db:apply-coupon-patches
+```
+
+  - Or only add missing booking columns on `coupons`:
+
+```bash
+npm run db:fix-coupon-columns
+```
+
+  - The JSON error may include **`prismaMeta`** — check it for the exact column Prisma expected.
 
 ## Notes
 
 - Existing DB is used in safe mode (no destructive reset)
-- Coupon redemptions are tracked per customer in `coupon_redemptions`
+- **Coupons** (`coupons` table) and **redemptions** (`coupon_redemptions`) are managed with **Sequelize** models (`src/models/coupon.model.js`, `src/models/coupon_redemption.model.js`). They are **not** in `prisma/schema.prisma` so Prisma stays aligned with the rest of the DB introspection without duplicate/outdated coupon models.
+- **First / Nth booking** rules are only active if your `coupons` table has `booking_condition` and `nth_booking` columns and you add those fields back to the Sequelize `Coupon` model. Until then, all coupons behave as “any customer” for booking index.
+- Customer booking counts for coupon rules still use Prisma **`engagements`** count only.
 - Prisma client generation:
 
 ```bash

@@ -8,48 +8,6 @@ datasource db {
   provider = "postgresql"
 }
 
-model Coupon {
-  coupon_id           String                     @id @default(uuid()) @db.Uuid
-  coupon_code         String                     @unique @db.VarChar(255)
-  description         String?                    @db.VarChar(255)
-  service_type        enum_coupons_service_type
-  discount_type       enum_coupons_discount_type
-  discount_value      Float
-  minimum_order_value Float?
-  usage_limit         Int?
-  usage_per_user      Int?
-  start_date          DateTime                   @db.Timestamptz(6)
-  end_date            DateTime                   @db.Timestamptz(6)
-  city                String?                    @db.VarChar(255)
-  isActive            Boolean?                   @default(true)
-  created_at          DateTime?                  @db.Timestamptz(6)
-  booking_condition   String?                    @default("ANY") @db.VarChar(30)
-  nth_booking         Int?
-  coupon_redemptions  coupon_redemptions[]
-
-  @@map("coupons")
-}
-
-model coupon_redemptions {
-  redemption_id    String    @id @default(uuid()) @db.Uuid
-  coupon_id        String    @db.Uuid
-  customer_id      BigInt    @map("user_id")
-  engagement_id    BigInt?
-  status           String    @default("RESERVED") @db.VarChar(20)
-  discount_amount  Float
-  reserved_at      DateTime  @default(now()) @db.Timestamptz(6)
-  applied_at       DateTime? @db.Timestamptz(6)
-  released_at      DateTime? @db.Timestamptz(6)
-  expires_at       DateTime  @db.Timestamptz(6)
-  metadata         Json?
-  coupons          Coupon    @relation(fields: [coupon_id], references: [coupon_id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([coupon_id, status])
-  @@index([customer_id, coupon_id, status])
-  @@index([engagement_id])
-  @@map("coupon_redemptions")
-}
-
 model address {
   id                                                                 BigInt           @id @default(autoincrement())
   country                                                            String?          @db.VarChar(255)
@@ -773,13 +731,3 @@ model wallets {
   customer   customer? @relation(fields: [customerid], references: [customerid], onDelete: NoAction, onUpdate: NoAction, map: "wallets_customerid_fkey1")
 }
 
-enum enum_coupons_discount_type {
-  PERCENTAGE
-  FLAT
-}
-
-enum enum_coupons_service_type {
-  COOK
-  MAID
-  NANNY
-}
