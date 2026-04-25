@@ -2,6 +2,18 @@
 
 Node.js + Express service for managing coupons and coupon redemption tracking, with PostgreSQL (Prisma), Swagger docs, Prometheus metrics, and Grafana/Loki monitoring.
 
+## Observability quick reference
+
+| What | Where |
+|------|--------|
+| **Metrics** | `GET /metrics` (Prometheus text); scrape job name **`coupons-api`** (see `monitoring/prometheus/prometheus.yml`) |
+| **Logs (file)** | `logs/app.log` (JSON lines via `src/utils/logger.js`) |
+| **Logs (Grafana)** | Explore → **Loki** → `{job="coupons-app"}` |
+| **Stack (Docker)** | `npm run monitoring:up` or `npm run monitoring:up:auto` |
+| **URLs** | Prometheus `http://localhost:9090`, Grafana `http://localhost:3001` (admin/admin) |
+
+Grafana provisioning wires **Prometheus** (UID `prometheus`) and **Loki**; dashboard **Coupons API Monitoring** is auto-loaded.
+
 ## What this app does
 
 - Manages coupon lifecycle (create, list, update, deactivate)
