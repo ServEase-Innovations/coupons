@@ -10,7 +10,7 @@ Node.js + Express service for managing coupons and coupon redemption tracking, w
 | **Logs (file)** | `logs/app.log` (JSON lines via `src/utils/logger.js`) |
 | **Logs (Grafana)** | Explore → **Loki** → `{job="coupons-app"}` |
 | **Stack (Docker)** | `npm run monitoring:up` or `npm run monitoring:up:auto` |
-| **URLs** | Prometheus `http://localhost:9090`, Grafana `http://localhost:3001` (admin/admin) |
+| **URLs** | Prometheus `http://localhost:9090`, Grafana `http://localhost:3101` (admin/admin) |
 
 Grafana provisioning wires **Prometheus** (UID `prometheus`) and **Loki**; dashboard **Coupons API Monitoring** is auto-loaded.
 
@@ -175,7 +175,7 @@ npm run monitoring:down
 Monitoring URLs:
 
 - Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001` (admin/admin)
+- Grafana: `http://localhost:3101` (admin/admin)
 
 ## Metrics you can monitor
 

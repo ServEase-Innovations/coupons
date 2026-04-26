@@ -1,0 +1,11 @@
+{
+  "ext": "js,json,ts",
+  "ignore": [
+    "node_modules",
+    "logs",
+    "coverage",
+    "*.log",
+    "prisma/migrations"
+  ],
+  "delay": 200
+}
