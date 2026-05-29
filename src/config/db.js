@@ -4,14 +4,21 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
+const dbHost = process.env.DB_HOST || process.env.POSTGRES_HOST || "13.126.11.184";
+const dbPort = Number(process.env.DB_PORT || process.env.POSTGRES_PORT || 5432);
+const dbUser =
+  process.env.DB_USER || process.env.POSTGRES_USER || "serveaso";
+const dbPassword =
+  process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "serveaso";
+const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || "serveaso";
 
 export const sequelize = new Sequelize(
-  "serveaso",
-  "serveaso",
-  "serveaso",
+  dbName,
+  dbUser,
+  dbPassword,
   {
-    host: "13.126.11.184",
-    port: Number(process.env.DB_PORT) || 5432,
+    host: dbHost,
+    port: dbPort,
     dialect: "postgres",
 
     logging: false, // change to console.log if debugging
@@ -42,7 +49,9 @@ export const sequelize = new Sequelize(
 export const connectDB = async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Database connected successfully");
+    console.log(
+      `✅ Coupons DB connected: host=${dbHost} port=${dbPort} db=${dbName} user=${dbUser}`
+    );
   } catch (error) {
     console.error("❌ Database connection failed:", error.message);
     process.exit(1);

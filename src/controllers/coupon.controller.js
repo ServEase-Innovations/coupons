@@ -52,9 +52,9 @@ export const getCouponById = async (req, res, next) => {
 
 export const getCouponsForCustomer = async (req, res, next) => {
   try {
-    const data = await couponService.getCouponsForCustomer(
-      req.params.customer_id
-    );
+    const data = await couponService.getCouponsForCustomer(req.params.customer_id, {
+      serviceType: req.query.serviceType || req.query.service_type,
+    });
     observeCouponAction({ action: "get_coupons_for_customer", result: "success" });
     res.json({
       success: true,

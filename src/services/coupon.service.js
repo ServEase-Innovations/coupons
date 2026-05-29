@@ -60,6 +60,17 @@ const getDiscountAmount = (coupon, orderValue) => {
   return Math.min(coupon.discount_value, orderValue);
 };
 
+/** Cook uses maid pricing; maid coupons apply to cook bookings until dedicated cook coupons exist. */
+export const couponMatchesServiceType = (requestedServiceType, couponServiceType) => {
+  const req = String(requestedServiceType || "").trim().toUpperCase();
+  const couponSt = String(couponServiceType || "").trim().toUpperCase();
+  if (!req || !couponSt) return true;
+  if (req === couponSt) return true;
+  return req === "COOK" && couponSt === "MAID";
+};
+
+const serviceTypesMatch = couponMatchesServiceType;
+
 const assertCouponEligibility = ({
   coupon,
   now,
@@ -87,7 +98,7 @@ const assertCouponEligibility = ({
     );
   }
 
-  if (serviceType && coupon.service_type !== serviceType) {
+  if (serviceType && !serviceTypesMatch(serviceType, coupon.service_type)) {
     throw createHttpError(
       "Coupon not valid for this service type",
       400,
@@ -142,9 +153,24 @@ const assertCouponEligibility = ({
 };
 
 export const countCustomerPriorBookings = async (customerId) => {
-  return prisma.engagements.count({
-    where: { customerid: customerId },
-  });
+  try {
+    return await prisma.engagements.count({
+      where: { customerid: customerId },
+    });
+  } catch (err) {
+    const code = err?.code;
+    // If Prisma DB is misconfigured/unreachable, keep coupon APIs usable
+    // by falling back to "no prior bookings" instead of hard-failing 500.
+    if (code === "P1001" || code === "P1002" || code === "P1003") {
+      logger.warn("[coupon.prisma] countCustomerPriorBookings fallback", {
+        code,
+        message: err?.message,
+        customerId: customerId?.toString?.() ?? String(customerId),
+      });
+      return 0;
+    }
+    throw err;
+  }
 };
 
 const getBookingCondition = (coupon) =>
@@ -222,8 +248,11 @@ export const getCouponById = async (couponId) => {
   return row.get({ plain: true });
 };
 
-export const getCouponsForCustomer = async (customerIdRaw) => {
+export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
   const customerId = getCustomerId(customerIdRaw);
+  const serviceType = options.serviceType
+    ? String(options.serviceType).trim().toUpperCase()
+    : null;
   const now = new Date();
   const priorBookingCount = await countCustomerPriorBookings(customerId);
 
@@ -238,7 +267,10 @@ export const getCouponsForCustomer = async (customerIdRaw) => {
 
   const coupons = rows
     .map((r) => r.get({ plain: true }))
-    .filter((c) => matchesBookingCondition(c, priorBookingCount));
+    .filter((c) => matchesBookingCondition(c, priorBookingCount))
+    .filter((c) =>
+      serviceType ? couponMatchesServiceType(serviceType, c.service_type) : true
+    );
 
   return {
     customer_id: customerId.toString(),
