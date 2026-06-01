@@ -1,8 +1,7 @@
-import { Op, Transaction } from "sequelize";
+import { Op, QueryTypes, Transaction } from "sequelize";
 import { sequelize } from "../config/db.js";
 import { Coupon } from "../models/coupon.model.js";
 import { CouponRedemption } from "../models/coupon_redemption.model.js";
-import { prisma } from "../config/prisma.js";
 import { logger } from "../utils/logger.js";
 
 const toDate = (value) => {
@@ -154,22 +153,23 @@ const assertCouponEligibility = ({
 
 export const countCustomerPriorBookings = async (customerId) => {
   try {
-    return await prisma.engagements.count({
-      where: { customerid: customerId },
-    });
+    const rows = await sequelize.query(
+      `SELECT COUNT(*)::int AS count
+       FROM engagements
+       WHERE customerid = :customerId`,
+      {
+        replacements: { customerId: customerId.toString() },
+        type: QueryTypes.SELECT,
+      }
+    );
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    return Number(row?.count ?? 0);
   } catch (err) {
-    const code = err?.code;
-    // If Prisma DB is misconfigured/unreachable, keep coupon APIs usable
-    // by falling back to "no prior bookings" instead of hard-failing 500.
-    if (code === "P1001" || code === "P1002" || code === "P1003") {
-      logger.warn("[coupon.prisma] countCustomerPriorBookings fallback", {
-        code,
-        message: err?.message,
-        customerId: customerId?.toString?.() ?? String(customerId),
-      });
-      return 0;
-    }
-    throw err;
+    logger.warn("[coupon] countCustomerPriorBookings fallback to 0", {
+      message: err?.message,
+      customerId: customerId?.toString?.() ?? String(customerId),
+    });
+    return 0;
   }
 };
 
