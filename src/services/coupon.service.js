@@ -14,6 +14,12 @@ const toDate = (value) => {
   return new Date(value);
 };
 
+const toDateFromEpochSeconds = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(Math.floor(n) * 1000);
+};
+
 const normalizeCouponDates = (data = {}) => {
   const normalized = { ...data };
 
@@ -23,12 +29,54 @@ const normalizeCouponDates = (data = {}) => {
 
   if ("start_date" in normalized) {
     normalized.start_date = toDate(normalized.start_date);
+  } else if ("start_date_epoch" in normalized) {
+    normalized.start_date = toDateFromEpochSeconds(normalized.start_date_epoch);
   }
   if ("end_date" in normalized) {
     normalized.end_date = toDate(normalized.end_date);
+  } else if ("end_date_epoch" in normalized) {
+    normalized.end_date = toDateFromEpochSeconds(normalized.end_date_epoch);
+  }
+  if ("created_at" in normalized) {
+    normalized.created_at = toDate(normalized.created_at);
+  } else if ("created_at_epoch" in normalized) {
+    normalized.created_at = toDateFromEpochSeconds(normalized.created_at_epoch);
   }
 
+  delete normalized.start_date_epoch;
+  delete normalized.end_date_epoch;
+  delete normalized.created_at_epoch;
+
   return normalized;
+};
+
+const toEpochOrNull = (value) => {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 1000);
+};
+
+const withCouponEpochFields = (coupon) => {
+  if (!coupon || typeof coupon !== "object") return coupon;
+  return {
+    ...coupon,
+    start_date_epoch: toEpochOrNull(coupon.start_date),
+    end_date_epoch: toEpochOrNull(coupon.end_date),
+    created_at_epoch: toEpochOrNull(coupon.created_at),
+    updated_at_epoch: toEpochOrNull(coupon.updated_at),
+  };
+};
+
+const withRedemptionEpochFields = (redemption) => {
+  if (!redemption || typeof redemption !== "object") return redemption;
+  return {
+    ...redemption,
+    reserved_at_epoch: toEpochOrNull(redemption.reserved_at),
+    applied_at_epoch: toEpochOrNull(redemption.applied_at),
+    released_at_epoch: toEpochOrNull(redemption.released_at),
+    expires_at_epoch: toEpochOrNull(redemption.expires_at),
+  };
 };
 
 const getCustomerId = (customerId) => {
@@ -225,14 +273,14 @@ export const createCoupon = async (data) => {
     coupon_code: normalized.coupon_code,
   });
   const row = await Coupon.create(normalized);
-  return row.get({ plain: true });
+  return withCouponEpochFields(row.get({ plain: true }));
 };
 
 export const getAllCoupons = async () => {
   const rows = await Coupon.findAll({
     where: { isActive: true },
   });
-  return rows.map((r) => r.get({ plain: true }));
+  return rows.map((r) => withCouponEpochFields(r.get({ plain: true })));
 };
 
 export const getCouponById = async (couponId) => {
@@ -245,7 +293,7 @@ export const getCouponById = async (couponId) => {
       "Coupon not found."
     );
   }
-  return row.get({ plain: true });
+  return withCouponEpochFields(row.get({ plain: true }));
 };
 
 export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
@@ -266,7 +314,7 @@ export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
   });
 
   const coupons = rows
-    .map((r) => r.get({ plain: true }))
+    .map((r) => withCouponEpochFields(r.get({ plain: true })))
     .filter((c) => matchesBookingCondition(c, priorBookingCount))
     .filter((c) =>
       serviceType ? couponMatchesServiceType(serviceType, c.service_type) : true
@@ -316,7 +364,7 @@ export const updateCouponById = async (couponId, data) => {
     );
   }
   const row = await Coupon.findByPk(couponId);
-  return row.get({ plain: true });
+  return withCouponEpochFields(row.get({ plain: true }));
 };
 
 export const validateCoupon = async ({
@@ -467,7 +515,7 @@ export const reserveCoupon = async ({
         },
         { transaction }
       );
-      return created.get({ plain: true });
+      return withRedemptionEpochFields(created.get({ plain: true }));
     } catch (error) {
       if (error.name === "SequelizeUniqueConstraintError") {
         throw createHttpError(
@@ -520,7 +568,7 @@ export const confirmCoupon = async ({ redemption_id }) => {
   });
 
   const updated = await CouponRedemption.findByPk(redemption_id);
-  return updated.get({ plain: true });
+  return withRedemptionEpochFields(updated.get({ plain: true }));
 };
 
 export const releaseCoupon = async ({ redemption_id }) => {
@@ -552,5 +600,5 @@ export const releaseCoupon = async ({ redemption_id }) => {
   });
 
   const updated = await CouponRedemption.findByPk(redemption_id);
-  return updated.get({ plain: true });
+  return withRedemptionEpochFields(updated.get({ plain: true }));
 };

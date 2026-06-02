@@ -7,7 +7,7 @@ const { PrismaClient } = prismaPkg;
 
 function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const host = process.env.DB_HOST || process.env.POSTGRES_HOST || "13.126.11.184";
+  const host = process.env.DB_HOST || process.env.POSTGRES_HOST || "127.0.0.1";
   const port = process.env.DB_PORT || process.env.POSTGRES_PORT || "5432";
   const user = process.env.DB_USER || process.env.POSTGRES_USER || "serveaso";
   const password =

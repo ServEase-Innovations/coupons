@@ -2,6 +2,30 @@ import * as couponService from "../services/coupon.service.js";
 import { observeCouponAction } from "../monitoring/prometheus.js";
 import { logger } from "../utils/logger.js";
 
+function normalizeCouponActionPayload(body = {}) {
+  return {
+    ...body,
+    customer_id:
+      body.customer_id ??
+      body.customerId,
+    coupon_code:
+      body.coupon_code ??
+      body.couponCode,
+    order_value:
+      body.order_value ??
+      body.orderValue,
+    service_type:
+      body.service_type ??
+      body.serviceType,
+    engagement_id:
+      body.engagement_id ??
+      body.engagementId,
+    redemption_id:
+      body.redemption_id ??
+      body.redemptionId,
+  };
+}
+
 // Controller for POST /api/coupons/create
 export const createCoupon = async (req, res, next) => {
   try {
@@ -112,7 +136,8 @@ export const updateCoupon = async (req, res, next) => {
 
 export const validateCoupon = async (req, res, next) => {
   try {
-    const result = await couponService.validateCoupon(req.body);
+    const payload = normalizeCouponActionPayload(req.body);
+    const result = await couponService.validateCoupon(payload);
     observeCouponAction({ action: "validate_coupon", result: "success" });
     res.json({
       success: true,
@@ -127,7 +152,8 @@ export const validateCoupon = async (req, res, next) => {
 
 export const reserveCoupon = async (req, res, next) => {
   try {
-    const result = await couponService.reserveCoupon(req.body);
+    const payload = normalizeCouponActionPayload(req.body);
+    const result = await couponService.reserveCoupon(payload);
     observeCouponAction({ action: "reserve_coupon", result: "success" });
     res.status(201).json({
       success: true,
@@ -142,7 +168,8 @@ export const reserveCoupon = async (req, res, next) => {
 
 export const confirmCoupon = async (req, res, next) => {
   try {
-    const result = await couponService.confirmCoupon(req.body);
+    const payload = normalizeCouponActionPayload(req.body);
+    const result = await couponService.confirmCoupon(payload);
     observeCouponAction({ action: "confirm_coupon", result: "success" });
     res.json({
       success: true,
@@ -157,7 +184,8 @@ export const confirmCoupon = async (req, res, next) => {
 
 export const releaseCoupon = async (req, res, next) => {
   try {
-    const result = await couponService.releaseCoupon(req.body);
+    const payload = normalizeCouponActionPayload(req.body);
+    const result = await couponService.releaseCoupon(payload);
     observeCouponAction({ action: "release_coupon", result: "success" });
     res.json({
       success: true,

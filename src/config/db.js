@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
-const dbHost = process.env.DB_HOST || process.env.POSTGRES_HOST || "13.126.11.184";
+const dbHost = process.env.DB_HOST || process.env.POSTGRES_HOST || "127.0.0.1";
 const dbPort = Number(process.env.DB_PORT || process.env.POSTGRES_PORT || 5432);
 const dbUser =
   process.env.DB_USER || process.env.POSTGRES_USER || "serveaso";

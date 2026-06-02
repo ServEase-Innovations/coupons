@@ -80,9 +80,11 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     await connectDB();
-    await sequelize.sync();
-
-    logger.info("Tables created successfully");
+    // Do not sequelize.sync() on shared DB — use monorepo: npm run db:migrate
+    if (process.env.COUPONS_SEQUELIZE_SYNC === "true") {
+      await sequelize.sync();
+      logger.warn("COUPONS_SEQUELIZE_SYNC=true — only coupon Sequelize models were synced");
+    }
 
     app.listen(PORT, () => {
       logger.info("Server running", {

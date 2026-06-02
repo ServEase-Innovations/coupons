@@ -125,6 +125,29 @@ npx prisma db execute --file prisma/migrations/20260326000000_coupon_booking_con
 - `POST /confirm` - mark reservation as applied after payment success
 - `POST /release` - release reservation on failure/cancel/timeout
 
+## Epoch-first contract
+
+Coupons service now supports epoch mirrors in responses and epoch/alias compatibility in request payloads.
+
+- Coupon response mirrors:
+  - `start_date_epoch`, `end_date_epoch`, `created_at_epoch`, `updated_at_epoch`
+- Redemption response mirrors:
+  - `reserved_at_epoch`, `applied_at_epoch`, `released_at_epoch`, `expires_at_epoch`
+
+Request compatibility aliases:
+
+- Coupon create/update accepts:
+  - legacy: `start_date`, `end_date`, `created_at`
+  - epoch aliases: `start_date_epoch`, `end_date_epoch`, `created_at_epoch`
+- Validate/reserve actions accept camelCase and snake_case:
+  - `couponCode`/`coupon_code`
+  - `customerId`/`customer_id`
+  - `orderValue`/`order_value`
+  - `serviceType`/`service_type`
+  - `engagementId`/`engagement_id`
+- Confirm/release accepts:
+  - `redemptionId`/`redemption_id`
+
 ### Recommended flow
 
 1. Customer enters coupon -> call `validate`
