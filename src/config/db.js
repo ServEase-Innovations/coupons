@@ -1,9 +1,6 @@
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("../../../../scripts/postgres-env.cjs");
+import { syncPostgresDbAliases, requirePostgresDatabaseName } from "./postgresEnv.js";
 
 dotenv.config();
 syncPostgresDbAliases(process.env);

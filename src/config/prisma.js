@@ -2,10 +2,7 @@ import "dotenv/config";
 import prismaPkg from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const { syncPostgresDbAliases, buildDatabaseUrl } = require("../../../../scripts/postgres-env.cjs");
+import { syncPostgresDbAliases, buildDatabaseUrl } from "./postgresEnv.js";
 
 syncPostgresDbAliases(process.env);
 
