@@ -1,7 +1,7 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import { connectDB, sequelize } from "./config/db.js";
+import { patchCouponSchema } from "./scripts/patchCouponSchema.js";
 import couponRoutes from "./routes/coupon.routes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import requestMetrics from "./middleware/requestMetrics.js";
@@ -10,8 +10,6 @@ import swaggerSpec from "./swagger/swagger.js";
 import { resolveSwaggerServerUrl } from "./utils/swaggerServerUrl.js";
 import { getMetrics, metricsContentType } from "./monitoring/prometheus.js";
 import { logger } from "./utils/logger.js";
-
-dotenv.config();
 
 const app = express();
 
@@ -80,6 +78,9 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     await connectDB();
+    if (process.env.APPLY_COUPON_SCHEMA_PATCH !== "false") {
+      await patchCouponSchema();
+    }
     // Do not sequelize.sync() on shared DB — use monorepo: npm run db:migrate
     if (process.env.COUPONS_SEQUELIZE_SYNC === "true") {
       await sequelize.sync();

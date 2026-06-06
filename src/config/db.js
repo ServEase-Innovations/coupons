@@ -1,9 +1,42 @@
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
-import { syncPostgresDbAliases, requirePostgresDatabaseName } from "./postgresEnv.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import {
+  syncPostgresDbAliases,
+  requirePostgresDatabaseName,
+  loadMonorepoPostgresEnv,
+} from "./postgresEnv.js";
 
-dotenv.config();
-syncPostgresDbAliases(process.env);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const serviceRoot = path.resolve(__dirname, "../..");
+
+function loadCouponsEnv() {
+  const nodeEnv = process.env.NODE_ENV || "development";
+
+  const serviceEnvPath = path.join(serviceRoot, `.env.${nodeEnv}`);
+  const serviceFallback = path.join(serviceRoot, ".env");
+
+  if (fs.existsSync(serviceEnvPath)) {
+    dotenv.config({ path: serviceEnvPath, override: false });
+  } else if (fs.existsSync(serviceFallback)) {
+    dotenv.config({ path: serviceFallback, override: false });
+  }
+
+  const { loaded } = loadMonorepoPostgresEnv();
+  if (loaded.length) {
+    console.log("✔ Loaded monorepo postgres env:", loaded.join(", "));
+  }
+
+  if (process.env.DOTENV_PATH && fs.existsSync(process.env.DOTENV_PATH)) {
+    dotenv.config({ path: process.env.DOTENV_PATH, override: true });
+  }
+
+  syncPostgresDbAliases(process.env);
+}
+
+loadCouponsEnv();
 
 const isProduction = process.env.NODE_ENV === "production";
 const dbHost = process.env.DB_HOST || process.env.POSTGRES_HOST || "127.0.0.1";
@@ -14,39 +47,34 @@ const dbPassword =
   process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "serveaso";
 const dbName = requirePostgresDatabaseName(process.env);
 
-export const sequelize = new Sequelize(
-  dbName,
-  dbUser,
-  dbPassword,
-  {
-    host: dbHost,
-    port: dbPort,
-    dialect: "postgres",
+export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
+  host: dbHost,
+  port: dbPort,
+  dialect: "postgres",
 
-    logging: false, // change to console.log if debugging
+  logging: false,
 
-    pool: {
-      max: 10,        // max connections
-      min: 0,
-      acquire: 30000, // max time (ms) to get connection
-      idle: 10000,    // max time (ms) connection can be idle
-    },
+  pool: {
+    max: 10,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  },
 
-    dialectOptions: isProduction
-      ? {
-          ssl: {
-            require: true,
-            rejectUnauthorized: false,
-          },
-        }
-      : {},
+  dialectOptions: isProduction
+    ? {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      }
+    : {},
 
-    define: {
-      freezeTableName: true, // prevents plural table names
-      timestamps: false,
-    },
-  }
-);
+  define: {
+    freezeTableName: true,
+    timestamps: false,
+  },
+});
 
 export const connectDB = async () => {
   try {

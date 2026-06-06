@@ -71,6 +71,17 @@ export const Coupon = sequelize.define(
       defaultValue: true,
     },
 
+    booking_condition: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+      defaultValue: "ANY",
+    },
+
+    nth_booking: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

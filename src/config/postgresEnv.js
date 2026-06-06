@@ -73,8 +73,17 @@ function loadPostgresEnvHelpers() {
     return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`;
   }
 
-  return { syncPostgresDbAliases, requirePostgresDatabaseName, buildDatabaseUrl };
+  return {
+    syncPostgresDbAliases,
+    requirePostgresDatabaseName,
+    buildDatabaseUrl,
+    loadMonorepoPostgresEnv: () => ({ root: null, loaded: [] }),
+  };
 }
 
-export const { syncPostgresDbAliases, requirePostgresDatabaseName, buildDatabaseUrl } =
-  loadPostgresEnvHelpers();
+export const {
+  syncPostgresDbAliases,
+  requirePostgresDatabaseName,
+  buildDatabaseUrl,
+  loadMonorepoPostgresEnv,
+} = loadPostgresEnvHelpers();

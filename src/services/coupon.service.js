@@ -265,9 +265,23 @@ export const createCoupon = async (data) => {
     normalized.created_at = new Date();
   }
 
-  // DB may not have these columns yet — ignore if client sends them
-  delete normalized.booking_condition;
-  delete normalized.nth_booking;
+  if (normalized.booking_condition != null) {
+    normalized.booking_condition = String(normalized.booking_condition)
+      .trim()
+      .toUpperCase();
+  }
+  if (normalized.nth_booking != null) {
+    const n = Number(normalized.nth_booking);
+    normalized.nth_booking = Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  }
+  if (normalized.booking_condition === "NTH_BOOKING" && !normalized.nth_booking) {
+    throw createHttpError(
+      "nth_booking is required when booking_condition is NTH_BOOKING",
+      400,
+      "COUPON_INVALID_NTH",
+      "Booking number is required for this coupon type."
+    );
+  }
 
   logger.info("[coupon.create] creating coupon", {
     coupon_code: normalized.coupon_code,
@@ -349,8 +363,13 @@ export const softDeleteCoupon = async (couponCode) => {
 
 export const updateCouponById = async (couponId, data) => {
   const patch = normalizeCouponDates(data);
-  delete patch.booking_condition;
-  delete patch.nth_booking;
+  if (patch.booking_condition != null) {
+    patch.booking_condition = String(patch.booking_condition).trim().toUpperCase();
+  }
+  if (patch.nth_booking != null) {
+    const n = Number(patch.nth_booking);
+    patch.nth_booking = Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  }
 
   const [updated] = await Coupon.update(patch, {
     where: { coupon_id: couponId },
