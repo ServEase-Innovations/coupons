@@ -49,15 +49,21 @@ const errorHandler = (err, req, res, next) => {
     meta: err.meta,
   });
 
-  res.status(status).json({
+  const body = {
     success: false,
     code,
     message: userMessage || "Something went wrong. Please try again.",
-    debugMessage,
     requestId,
     errors: err.errors || null,
-    ...(err.meta && { prismaMeta: err.meta }),
-  });
+  };
+  if (process.env.NODE_ENV !== "production") {
+    body.debugMessage = debugMessage;
+    if (err.meta) {
+      body.prismaMeta = err.meta;
+    }
+  }
+
+  res.status(status).json(body);
 };
 
 export default errorHandler;
