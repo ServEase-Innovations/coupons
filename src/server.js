@@ -13,8 +13,14 @@ import { logger } from "./utils/logger.js";
 
 const app = express();
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const getAllowedOrigins = () => {
-  const raw = process.env.CORS_ORIGINS || process.env.APP_URL || "";
+  const raw =
+    process.env.CORS_ORIGINS ||
+    process.env.ALLOWED_ORIGINS ||
+    process.env.APP_URL ||
+    "";
   return raw
     .split(",")
     .map((s) => s.trim())
@@ -23,16 +29,29 @@ const getAllowedOrigins = () => {
 
 const allowedOrigins = getAllowedOrigins();
 
+if (isProduction && allowedOrigins.length === 0) {
+  throw new Error(
+    "CORS_ORIGINS is required when NODE_ENV=production (comma-separated web/mobile origins)"
+  );
+}
+
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow non-browser requests (curl, server-to-server) with no Origin header
       if (!origin) return cb(null, true);
-      // If not configured, allow all origins (useful for local dev)
       if (allowedOrigins.length === 0) return cb(null, true);
-      // Otherwise allow only configured origins
-      return cb(null, allowedOrigins.includes(origin));
+      return cb(null, allowedOrigins.includes(origin) || allowedOrigins.includes("*"));
     },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+    ],
+    credentials: true,
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -42,6 +61,27 @@ app.use(requestMetrics);
 
 app.get("/", (req, res) => {
   res.send("Coupons API is running");
+});
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "coupons",
+    uptime: process.uptime(),
+  });
+});
+
+app.get("/ready", async (_req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.status(200).json({ status: "ready", service: "coupons" });
+  } catch (error) {
+    res.status(503).json({
+      status: "not_ready",
+      service: "coupons",
+      error: error?.message || "database unreachable",
+    });
+  }
 });
 
 // Routes
