@@ -8,6 +8,7 @@ import {
   requirePostgresDatabaseName,
   loadMonorepoPostgresEnv,
 } from "./postgresEnv.js";
+import { buildPostgresSsl, logPostgresSsl } from "./postgresSsl.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serviceRoot = path.resolve(__dirname, "../..");
@@ -38,8 +39,9 @@ function loadCouponsEnv() {
 
 loadCouponsEnv();
 
-const isProduction = process.env.NODE_ENV === "production";
 const dbHost = process.env.DB_HOST || process.env.POSTGRES_HOST || "127.0.0.1";
+const { dialectOptions: postgresDialectOptions } = buildPostgresSsl(process.env);
+logPostgresSsl(process.env);
 const dbPort = Number(process.env.DB_PORT || process.env.POSTGRES_PORT || 5432);
 const dbUser =
   process.env.DB_USER || process.env.POSTGRES_USER || "serveaso";
@@ -61,14 +63,7 @@ export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
     idle: 10000,
   },
 
-  dialectOptions: isProduction
-    ? {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-      }
-    : {},
+  dialectOptions: postgresDialectOptions,
 
   define: {
     freezeTableName: true,
