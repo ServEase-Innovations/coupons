@@ -112,10 +112,10 @@ When creating/updating a coupon:
 
 `validate` / `reserve` enforce the same rules using `engagements` count for `customer_id`.
 
-Apply DB migration for new columns:
+Apply DB migration from the monorepo (includes `096_coupon_booking_conditions.sql`):
 
 ```bash
-npx prisma db execute --file prisma/migrations/20260326000000_coupon_booking_conditions/migration.sql
+npm run db:migrate
 ```
 
 ## Redemption APIs (customer checkout flow)
@@ -266,7 +266,7 @@ npm run db:fix-coupon-columns
 
 - Existing DB is used in safe mode (no destructive reset)
 - **Coupons** (`coupons` table) and **redemptions** (`coupon_redemptions`) are managed with **Sequelize** models (`src/models/coupon.model.js`, `src/models/coupon_redemption.model.js`). They are **not** in `prisma/schema.prisma` so Prisma stays aligned with the rest of the DB introspection without duplicate/outdated coupon models.
-- **First / Nth booking** rules are only active if your `coupons` table has `booking_condition` and `nth_booking` columns and you add those fields back to the Sequelize `Coupon` model. Until then, all coupons behave as “any customer” for booking index.
+- **First / Nth booking** rules require `booking_condition` and `nth_booking` on the `coupons` table (migration `096` via `npm run db:migrate`). The Sequelize `Coupon` model includes these fields.
 - Customer booking counts for coupon rules still use Prisma **`engagements`** count only.
 - Prisma client generation:
 
