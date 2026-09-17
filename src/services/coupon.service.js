@@ -101,10 +101,25 @@ const createHttpError = (
 
 const getDiscountAmount = (coupon, orderValue) => {
   if (orderValue <= 0) return 0;
+  
+  let discountAmount = 0;
+  
   if (coupon.discount_type === "PERCENTAGE") {
-    return Math.min((orderValue * coupon.discount_value) / 100, orderValue);
+    discountAmount = Math.min((orderValue * coupon.discount_value) / 100, orderValue);
+  } else {
+    discountAmount = Math.min(coupon.discount_value, orderValue);
   }
-  return Math.min(coupon.discount_value, orderValue);
+  
+  // If coupon has minimum_final_amount set (e.g., ₹1), ensure final amount doesn't go below it
+  if (coupon.minimum_final_amount && coupon.minimum_final_amount > 0) {
+    const minFinal = Number(coupon.minimum_final_amount);
+    const maxDiscount = orderValue - minFinal;
+    if (maxDiscount > 0) {
+      discountAmount = Math.min(discountAmount, maxDiscount);
+    }
+  }
+  
+  return discountAmount;
 };
 
 /** Cook uses maid pricing; maid coupons apply to cook bookings until dedicated cook coupons exist. */
