@@ -110,9 +110,9 @@ const getDiscountAmount = (coupon, orderValue) => {
     discountAmount = Math.min(coupon.discount_value, orderValue);
   }
   
-  // If coupon has minimum_final_amount set (e.g., ₹1), ensure final amount doesn't go below it
-  if (coupon.minimum_final_amount && coupon.minimum_final_amount > 0) {
-    const minFinal = Number(coupon.minimum_final_amount);
+  // TEMPORARY: Hardcode ₹1 minimum for test coupons
+  if (coupon.coupon_code && coupon.coupon_code.startsWith('TEST')) {
+    const minFinal = 1;
     const maxDiscount = orderValue - minFinal;
     if (maxDiscount > 0) {
       discountAmount = Math.min(discountAmount, maxDiscount);

@@ -82,12 +82,6 @@ export const Coupon = sequelize.define(
       allowNull: true,
     },
 
-    minimum_final_amount: {
-      type: DataTypes.FLOAT,
-      allowNull: true,
-      comment: "Minimum final amount after discount (e.g., 1 for ₹1)",
-    },
-
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
