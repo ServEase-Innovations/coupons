@@ -131,6 +131,24 @@ export const couponMatchesServiceType = (requestedServiceType, couponServiceType
   return req === "COOK" && couponSt === "MAID";
 };
 
+/**
+ * Check if a coupon matches the requested booking type.
+ * If coupon has no booking_type set, it's valid for all booking types (backward compatibility).
+ * ONDEMAND in API matches both "ONDEMAND" and "ON_DEMAND" variations.
+ */
+export const matchesBookingType = (requestedType, couponBookingType) => {
+  const requested = String(requestedType || "").trim().toUpperCase();
+  const coupon = String(couponBookingType || "").trim().toUpperCase();
+
+  // If coupon has no booking_type, it's valid everywhere (backward compatibility)
+  if (!coupon) return true;
+
+  // Normalize ON_DEMAND and ONDEMAND to match
+  const normalizeType = (type) => type.replace(/_/g, "");
+  
+  return normalizeType(requested) === normalizeType(coupon);
+};
+
 const serviceTypesMatch = couponMatchesServiceType;
 
 const assertCouponEligibility = ({
@@ -330,6 +348,9 @@ export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
   const serviceType = options.serviceType
     ? String(options.serviceType).trim().toUpperCase()
     : null;
+  const bookingType = options.bookingType
+    ? String(options.bookingType).trim().toUpperCase()
+    : null;
   const now = new Date();
   const priorBookingCount = await countCustomerPriorBookings(customerId);
 
@@ -347,6 +368,9 @@ export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
     .filter((c) => matchesBookingCondition(c, priorBookingCount))
     .filter((c) =>
       serviceType ? couponMatchesServiceType(serviceType, c.service_type) : true
+    )
+    .filter((c) =>
+      bookingType ? matchesBookingType(bookingType, c.booking_type) : true
     );
 
   return {
