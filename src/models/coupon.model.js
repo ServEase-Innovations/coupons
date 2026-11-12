@@ -26,6 +26,12 @@ export const Coupon = sequelize.define(
       allowNull: false,
     },
 
+    booking_type: {
+      type: DataTypes.ENUM("MONTHLY", "ONDEMAND", "SHORTTERM"),
+      allowNull: true,
+      comment: "Booking type this coupon applies to (MONTHLY/ONDEMAND/SHORTTERM)",
+    },
+
     discount_type: {
       type: DataTypes.ENUM("PERCENTAGE", "FLAT"),
       allowNull: false,
