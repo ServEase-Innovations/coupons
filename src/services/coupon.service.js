@@ -140,13 +140,31 @@ export const matchesBookingType = (requestedType, couponBookingType) => {
   const requested = String(requestedType || "").trim().toUpperCase();
   const coupon = String(couponBookingType || "").trim().toUpperCase();
 
+  console.log('[matchesBookingType] Input:', {
+    requestedType: requested,
+    couponBookingType: coupon
+  });
+
   // If coupon has no booking_type, it's valid everywhere (backward compatibility)
-  if (!coupon) return true;
+  if (!coupon) {
+    console.log('[matchesBookingType] Coupon booking_type is NULL/empty, matches all → true');
+    return true;
+  }
 
   // Normalize ON_DEMAND and ONDEMAND to match
   const normalizeType = (type) => type.replace(/_/g, "");
   
-  return normalizeType(requested) === normalizeType(coupon);
+  const normalizedRequested = normalizeType(requested);
+  const normalizedCoupon = normalizeType(coupon);
+  const match = normalizedRequested === normalizedCoupon;
+  
+  console.log('[matchesBookingType] Result:', {
+    normalizedRequested,
+    normalizedCoupon,
+    match
+  });
+  
+  return match;
 };
 
 const serviceTypesMatch = couponMatchesServiceType;
@@ -354,6 +372,13 @@ export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
   const now = new Date();
   const priorBookingCount = await countCustomerPriorBookings(customerId);
 
+  console.log('[getCouponsForCustomer] Request:', {
+    customerId,
+    serviceType,
+    bookingType,
+    priorBookingCount
+  });
+
   const rows = await Coupon.findAll({
     where: {
       isActive: true,
@@ -363,22 +388,70 @@ export const getCouponsForCustomer = async (customerIdRaw, options = {}) => {
     order: [["created_at", "DESC"]],
   });
 
-  const coupons = rows
-    .map((r) => withCouponEpochFields(r.get({ plain: true })))
-    .filter((c) => matchesBookingCondition(c, priorBookingCount))
-    .filter((c) =>
-      serviceType ? couponMatchesServiceType(serviceType, c.service_type) : true
-    )
-    .filter((c) =>
-      bookingType ? matchesBookingType(bookingType, c.booking_type) : true
-    );
+  console.log('[getCouponsForCustomer] Found active coupons:', rows.length);
+  
+  const allCoupons = rows.map((r) => {
+    const plain = r.get({ plain: true });
+    console.log('[getCouponsForCustomer] Coupon data:', {
+      code: plain.coupon_code,
+      service_type: plain.service_type,
+      booking_type: plain.booking_type,
+      booking_condition: plain.booking_condition
+    });
+    return withCouponEpochFields(plain);
+  });
 
-  return {
+  console.log('[getCouponsForCustomer] After mapping:', allCoupons.length);
+
+  const afterBookingCondition = allCoupons.filter((c) => {
+    const match = matchesBookingCondition(c, priorBookingCount);
+    console.log('[getCouponsForCustomer] Booking condition filter:', {
+      code: c.coupon_code,
+      booking_condition: c.booking_condition,
+      priorBookingCount,
+      match
+    });
+    return match;
+  });
+
+  console.log('[getCouponsForCustomer] After booking condition filter:', afterBookingCondition.length);
+
+  const afterServiceType = afterBookingCondition.filter((c) => {
+    const match = serviceType ? couponMatchesServiceType(serviceType, c.service_type) : true;
+    console.log('[getCouponsForCustomer] Service type filter:', {
+      code: c.coupon_code,
+      requestedServiceType: serviceType,
+      couponServiceType: c.service_type,
+      match
+    });
+    return match;
+  });
+
+  console.log('[getCouponsForCustomer] After service type filter:', afterServiceType.length);
+
+  const coupons = afterServiceType.filter((c) => {
+    const match = bookingType ? matchesBookingType(bookingType, c.booking_type) : true;
+    console.log('[getCouponsForCustomer] Booking type filter:', {
+      code: c.coupon_code,
+      requestedBookingType: bookingType,
+      couponBookingType: c.booking_type,
+      match
+    });
+    return match;
+  });
+
+  console.log('[getCouponsForCustomer] Final filtered coupons:', coupons.length);
+
+  const result = {
     customer_id: customerId.toString(),
     prior_booking_count: priorBookingCount,
     next_booking_number: priorBookingCount + 1,
     coupons,
   };
+
+  console.log('[getCouponsForCustomer] Returning result with', coupons.length, 'coupons');
+
+  return result;
 };
 
 export const softDeleteCoupon = async (couponCode) => {

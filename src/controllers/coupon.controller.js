@@ -75,11 +75,28 @@ export const getCouponById = async (req, res, next) => {
 };
 
 export const getCouponsForCustomer = async (req, res, next) => {
+  console.log('[Controller.getCouponsForCustomer] Request:', {
+    customer_id: req.params.customer_id,
+    query: req.query,
+    serviceType: req.query.serviceType || req.query.service_type,
+    bookingType: req.query.bookingType || req.query.booking_type
+  });
+
   try {
     const data = await couponService.getCouponsForCustomer(req.params.customer_id, {
       serviceType: req.query.serviceType || req.query.service_type,
       bookingType: req.query.bookingType || req.query.booking_type,
     });
+    
+    console.log('[Controller.getCouponsForCustomer] Service returned:', {
+      couponCount: data.coupons?.length || 0,
+      coupons: data.coupons?.map(c => ({
+        code: c.coupon_code,
+        service_type: c.service_type,
+        booking_type: c.booking_type
+      }))
+    });
+    
     observeCouponAction({ action: "get_coupons_for_customer", result: "success" });
     res.json({
       success: true,
@@ -87,6 +104,7 @@ export const getCouponsForCustomer = async (req, res, next) => {
       data,
     });
   } catch (error) {
+    console.error('[Controller.getCouponsForCustomer] Error:', error);
     observeCouponAction({
       action: "get_coupons_for_customer",
       result: "failure",
